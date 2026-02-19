@@ -31,30 +31,31 @@ const Login = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { mutate, isPending } = useLogin();
+  // const { mutate, isPending } = useLogin();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+     navigate("/admin/dashboard");
 
-    mutate(
-      { emailAddress: email, password },
-      {
-        onSuccess: (data) => {
-//           console.log("Logged in:", data);
-          toast.success("Login successful!");
-          // redirect user
-          navigate("/admin/dashboard");
-          //   window.location.href = "/admin/dashboard";
-        },
-        onError: (err: any) => {
-          toast.error(err.message);
-        },
-      }
-    );
+//     mutate(
+//       { emailAddress: email, password },
+//       {
+//         onSuccess: (data) => {
+// //           console.log("Logged in:", data);
+//           toast.success("Login successful!");
+//           // redirect user
+//           navigate("/admin/dashboard");
+//           //   window.location.href = "/admin/dashboard";
+//         },
+//         onError: (err: any) => {
+//           toast.error(err.message);
+//         },
+//       }
+//     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl" />
@@ -64,12 +65,13 @@ const Login = () => {
       <Card className="w-full max-w-md relative z-10 border-border/50 bg-card/95 backdrop-blur-sm shadow-2xl">
         <CardHeader className="space-y-4 text-center pb-2">
           {/* Logo */}
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
-            <Car className="w-8 h-8 text-primary-foreground" />
+          <div className="relative mx-auto w-16 h-16 bg-stp-blue-dark rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
+            {/* <Car className="w-8 h-8 text-primary-foreground" /> */}
+            <img src="/logo.png"/>
           </div>
           <div>
             <CardTitle className="text-2xl font-bold tracking-tight">
-              Commuta Admin
+              Stp Admin
             </CardTitle>
             <CardDescription className="text-muted-foreground mt-1">
               Sign in to access the dashboard
@@ -86,7 +88,7 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@commuta.com"
+                placeholder="stp@commuta.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 bg-background/50 border-border/60 focus:border-primary"
@@ -130,10 +132,10 @@ const Login = () => {
 
             <Button
               type="submit"
-              className="w-full h-11 font-semibold shadow-lg shadow-primary/25 cursor-pointer"
-              disabled={isPending}
+              className="w-full h-11 font-semibold shadow-lg shadow-primary/25 cursor-pointer bg-stp-blue-dark"
+              // disabled={isPending}
             >
-              {isPending ? "Signing in..." : "Sign In"}
+              {false ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 

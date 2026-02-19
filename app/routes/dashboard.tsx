@@ -1,14 +1,21 @@
-import type { Route } from "./+types/home";
+import React from "react";
+import { 
+  Users, 
+  Car, 
+  ShieldAlert, 
+  MousePointer2, 
+  TrendingUp, 
+  ArrowUpRight 
+} from "lucide-react";
+     import { MessageSquare, Zap, FileDown, PlusCircle } from "lucide-react";
 
-import { Users, UserCircle, Car, MessageSquare } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription 
+} from "@/components/ui/card";
 import {
   BarChart,
   Bar,
@@ -17,220 +24,223 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
-import { useCallback, useState } from "react";
+import { Button } from "@/components/ui/button";
 
-import { PageHeader } from "@/components/page-header";
-import { MetricCard, MetricCardSkeleton } from "@/components/metric-card";
-import { useSummary } from "@/hooks/usePayout";
-import { transformSignupData, type SignupTrends } from "@/lib/helper";
-import { ChartSkeleton } from "@/components/chartSkeleton";
+// Mock Data for Charts
+const engagementData = [
+  { name: "Mon", clicks: 40 },
+  { name: "Tue", clicks: 30 },
+  { name: "Wed", clicks: 65 },
+  { name: "Thu", clicks: 45 },
+  { name: "Fri", clicks: 90 },
+  { name: "Sat", clicks: 25 },
+  { name: "Sun", clicks: 15 },
+];
 
-export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Admin - Overview" },
-    { name: "description", content: "Welcome to Commuta overview page" },
-  ];
-}
-export default function Overview() {
-  const [selectedPeriod, setSelectedPeriod] = useState("7");
+const userData = [
+  { name: "Verified Alumni", value: 850, color: "#0f172a" }, // primary
+  { name: "Guests", value: 320, color: "#94a3b8" }, // muted
+];
 
-  const { data: summaryData, isLoading: isSummaryLoading } = useSummary(selectedPeriod);
-
-  console.table(summaryData)
-
-    // Transform the trends data from backend to match chart format
-  const transformTrendsData = useCallback((trends?: Array<{
-    date: string;
-    label: string;
-    riders: number;
-    drivers: number;
-  }>) => {
-    if (!trends) return [];
-
-    return trends.map(trend => ({
-      date: trend.date,
-      week: trend.label, // Using "label" (e.g., "Mon", "Tue") as week display
-      riders: trend.riders,
-      drivers: trend.drivers,
-    }));
-  }, []);
-
- // Generate chart data based on selected period
-  const generateChartData = useCallback(
-    (days: number, trends?: Array<{
-      date: string;
-      label: string;
-      riders: number;
-      drivers: number;
-    }>) => {
-      // If we have backend data, transform and use it
-      if (trends && trends.length > 0) {
-        return transformTrendsData(trends);
-      }
-
-      // Fallback to mock data if no backend data
-      const data = [];
-      const today = new Date();
-
-      for (let i = days - 1; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-
-        data.push({
-          date: date.toISOString().split('T')[0], // Format: YYYY-MM-DD
-          week: date.toLocaleDateString("default", { weekday: "short" }), // e.g., "Mon"
-          riders: Math.floor(Math.random() * 500) + 100,
-          drivers: Math.floor(Math.random() * 300) + 50,
-        });
-      }
-
-      return data;
-    },
-    [transformTrendsData]
-  );
-
-  // console.log("summaryData",  summaryData);
-
-  const calculateMetrics = useCallback(
-    (days: number) => {
-      return {
-        totalRiders: summaryData?.data.overview.riders.total ?? 0,
-        totalDrivers: summaryData?.data.overview.drivers.total ?? 0,
-        totalTrips: summaryData?.data.overview.rides.total ?? 0,
-        totalForumUsers: summaryData?.data.overview.users.total ?? 0,
-      };
-    },
-    [summaryData]
-  );
-
-  const metrics = calculateMetrics(Number(selectedPeriod));
-
-  // Generate chart data
-  const chartData = generateChartData(
-    Number(selectedPeriod),
-    summaryData?.data.trends
-  );
-  // const chartData = generateChartData(Number(selectedPeriod));
-
-  // Show loader if navigation state is "loading"
-  //   if (navigation.state === "loading") {
-  //     return <div className="text-center p-10">Loading... home</div>;
-  //   }
-
+export default function AdminOverview() {
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Overview"
-        description="Platform performance and key metrics"
-        action={
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
-        }
-      />
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
+      </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {isSummaryLoading ? (
-          <>
-            <MetricCardSkeleton variant="info" />
-            <MetricCardSkeleton variant="success" />
-            <MetricCardSkeleton variant="accent" />
-            <MetricCardSkeleton variant="default" />
-          </>
-        ) : (
-          <>
-            <MetricCard
-              title="Total Riders"
-              value={metrics.totalRiders.toLocaleString()}
-              icon={Users}
-              trend={{ value: 12, label: "vs last period" }}
-              variant="info"
-            />
-            <MetricCard
-              title="Total Drivers"
-              value={metrics.totalDrivers.toLocaleString()}
-              icon={UserCircle}
-              trend={{ value: 8, label: "vs last period" }}
-              variant="success"
-            />
-            <MetricCard
-              title="Total Trips"
-              value={metrics.totalTrips.toLocaleString()}
-              icon={Car}
-              trend={{ value: 15, label: "vs last period" }}
-              variant="accent"
-            />
-            <MetricCard
-              title="Forum Users"
-              value={metrics.totalForumUsers.toLocaleString()}
-              icon={MessageSquare}
-              trend={{ value: 5, label: "vs last period" }}
-              variant="default"
-            />
-          </>
-        )}
+      {/* Top Level Metrics */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <MetricCard 
+          title="Total Users" 
+          value="1,170" 
+          description="Verified vs Guests" 
+          icon={<Users className="h-4 w-4 text-muted-foreground" />} 
+        />
+        <MetricCard 
+          title="Active Deal Rooms" 
+          value="12" 
+          description="4 closing soon" 
+          icon={<Car className="h-4 w-4 text-muted-foreground" />} 
+        />
+        <MetricCard 
+          title="Pending Verifications" 
+          value="28" 
+          description="Needs your attention" 
+          icon={<ShieldAlert className="h-4 w-4 text-orange-500" />} 
+          highlight
+        />
+        <MetricCard 
+          title="Marketplace Clicks" 
+          value="456" 
+          description="+18% from last week" 
+          icon={<MousePointer2 className="h-4 w-4 text-muted-foreground" />} 
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        {/* Engagement Chart */}
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Marketplace Engagement</CardTitle>
+            <CardDescription>Total "Connect" and "Chat" clicks initiated</CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={engagementData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
+                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                  <Tooltip 
+                    cursor={{ fill: '#f1f5f9' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                  <Bar dataKey="clicks" fill="currentColor" radius={[4, 4, 0, 0]} className="fill-primary" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* User Distribution */}
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>User Distribution</CardTitle>
+            <CardDescription>Verified Alumni vs. Guests</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={userData}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {userData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 space-y-2">
+              {userData.map((item) => (
+                <div key={item.name} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-muted-foreground">{item.name}</span>
+                  </div>
+                  <span className="font-medium">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
 
-<>
-      {isSummaryLoading ? <ChartSkeleton/>:<Card>
-        <CardHeader>
-          <CardTitle>Sign-up Trends</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis
-                  dataKey="formattedWeek" // Use formatted week for display
-                  stroke="var(--muted-foreground)"
-                  fontSize={12}
-                />
-                <YAxis
-                  stroke="var(--muted-foreground)"
-                  fontSize={12}
-                  allowDecimals={false}
-                />
-
-                <Tooltip
-                  formatter={(value) => [`${value} signups`, ""]}
-                  labelFormatter={(label) => `Week: ${label}`}
-                  contentStyle={{
-                    backgroundColor: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius)",
-                  }}
-                />
-                <Legend />
-                <Bar
-                  dataKey="riders"
-                  fill="var(--chart-1)"
-                  radius={[4, 4, 0, 0]}
-                  name="Riders"
-                />
-                <Bar
-                  dataKey="drivers"
-                  fill="var(--chart-2)"
-                  radius={[4, 4, 0, 0]}
-                  name="Drivers"
-                />
-              </BarChart>
-            </ResponsiveContainer>
+{/* Bottom Row - Recent Activity & System Health */}
+<div className="grid gap-4 md:grid-cols-2">
+  {/* 1. Recent Activity Feed */}
+  <Card>
+    <CardHeader>
+      <CardTitle>Recent Activity</CardTitle>
+      <CardDescription>Live updates from the STP network</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-6">
+        {[
+          { icon: <PlusCircle className="text-blue-500" />, text: "New Deal Room created", sub: "Tech Startup Seed Funding", time: "12m ago" },
+          { icon: <Zap className="text-yellow-500" />, text: "New Alumni joined", sub: "Dr. Sarah Jenkins (Class of '18)", time: "45m ago" },
+          { icon: <MessageSquare className="text-green-500" />, text: "Marketplace Inquiry", sub: "Interest in 'UI Design Service'", time: "2h ago" },
+          { icon: <FileDown className="text-muted-foreground" />, text: "Resource Downloaded", sub: "Investment_Template.pdf", time: "3h ago" },
+        ].map((item, i) => (
+          <div key={i} className="flex items-start gap-4">
+            <div className="mt-1 p-1 bg-muted rounded-full">{item.icon}</div>
+            <div className="flex-1 space-y-1">
+              <p className="text-sm font-medium leading-none">{item.text}</p>
+              <p className="text-xs text-muted-foreground">{item.sub}</p>
+            </div>
+            <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+              {item.time}
+            </div>
           </div>
-        </CardContent>
-      </Card>}
-</>
+        ))}
+      </div>
+      <Button variant="ghost" className="w-full mt-4 text-xs text-muted-foreground hover:text-primary">
+        View All Activity
+      </Button>
+    </CardContent>
+  </Card>
 
+  {/* 2. System Health & Quick Controls */}
+  <Card className="flex flex-col justify-between">
+    <CardHeader>
+      <CardTitle>System Health</CardTitle>
+      <CardDescription>Infrastructure & Database status</CardDescription>
+    </CardHeader>
+    <CardContent className="space-y-6">
+      <div className="flex items-center gap-4 border p-3 rounded-lg bg-muted/30">
+        <div className="relative">
+          <TrendingUp className="h-5 w-5 text-green-600" />
+          <span className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full animate-ping" />
+        </div>
+        <div className="flex-1 space-y-1">
+          <p className="text-sm font-medium">Server Status: Operational</p>
+          <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
+            <div className="bg-green-500 h-full w-[98%]" />
+          </div>
+        </div>
+      </div>
+{/* 
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase">Storage</p>
+          <p className="text-sm font-semibold">42.5 GB / 100 GB</p>
+        </div>
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase">Response</p>
+          <p className="text-sm font-semibold">124ms</p>
+        </div>
+      </div> */}
+
+      <div className="flex flex-col gap-2">
+        <Button variant="outline" className="w-full text-xs h-9" asChild>
+          <a href="/admin/system">
+            Manage Resources <ArrowUpRight className="ml-2 h-3 w-3" />
+          </a>
+        </Button>
+        <Button variant="secondary" className="w-full text-xs h-9">
+          Download Platform Report
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+</div>
     </div>
+  );
+}
+
+function MetricCard({ title, value, description, icon, highlight = false }: any) {
+  return (
+    <Card className={highlight ? "border-orange-200 bg-orange-50/30" : ""}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+      </CardContent>
+    </Card>
   );
 }

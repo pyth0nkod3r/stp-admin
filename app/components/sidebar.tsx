@@ -6,7 +6,7 @@ import {
   MessageSquare,
   UserCircle,
   LogOut,
-  Contact
+  Contact,
 } from "lucide-react";
 
 import {
@@ -21,18 +21,19 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLocation } from "react-router";
 import { NavLink } from "./nav-link";
 import { toast } from "sonner";
 
 const mainItems = [
   { title: "Overview", url: "/admin/dashboard", icon: LayoutDashboard },
-  { title: "Riders", url: "/admin/riders", icon: Users },
-  { title: "Drivers", url: "/admin/drivers", icon: UserCircle },
-  { title: "Trip Log", url: "/admin/trips", icon: Car },
-  { title: "Driver Payouts", url: "/admin/payouts", icon: DollarSign },
-  { title: "Forum Activity", url: "/admin/forum", icon: MessageSquare },
-  { title: "Contacts", url: "/admin/contacts", icon: Contact },
+  { title: "User Directory", url: "/admin/users", icon: Users },
+  { title: "Verification Queue", url: "/admin/verification", icon: UserCircle },
+  { title: "Deal Rooms", url: "/admin/deals", icon: Car },
+  { title: "Content & Engagement", url: "/admin/content", icon: DollarSign },
+  { title: "System & Management", url: "/admin/system", icon: MessageSquare },
+  // { title: "Contacts", url: "/admin/contacts", icon: Contact },
 ];
 
 export function AppSidebar() {
@@ -56,11 +57,7 @@ export function AppSidebar() {
       <SidebarContent>
         <div className={`${open ? "px-6" : "mx-auto"} py-6`}>
           <h2 className="text-xl font-bold text-sidebar-primary">
-            {open ? (
-              "Commuta"
-            ) : (
-              <Car className="w-6 h-6 text-sidebar-primary" />
-            )}
+            {open ? "Stp" : <Car className="w-6 h-6 text-sidebar-primary" />}
           </h2>
           {open && (
             <p className="text-xs text-sidebar-foreground/70 mt-1">
@@ -91,12 +88,38 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <p className="flex gap-2 cursor-pointer" onClick={logout}>
-          <LogOut className="h-6 w-6" />
+      <SidebarFooter className="p-2 transition-all duration-300 ease-in-out">
+        <div
+          className={`flex items-center w-full ${open ? "justify-between p-2" : "justify-center"} ${!open ? "flex-col gap-3" : "flex-row"}`}
+        >
+          <div className="flex items-center gap-3 overflow-hidden">
+            <Avatar className="h-9 w-9 shrink-0">
+              <AvatarImage src="https://github.com/shadcn.png" alt="@user" />
+              <AvatarFallback>JD</AvatarFallback>
+            </Avatar>
 
-          {open && <span className="ml-2">Logout</span>}
-        </p>
+            {open && (
+              <div className="flex flex-col items-start min-w-0 transition-opacity duration-300">
+                <span className="text-sm font-medium leading-none truncate w-full">
+                  John Doe
+                </span>
+                <span className="text-[10px] text-muted-foreground truncate w-[100px]">
+                  john@example.com
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* {open && ( */}
+            <button
+              onClick={logout}
+              className="p-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md transition-colors"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4 text-muted-foreground" />
+            </button>
+          {/* )} */}
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

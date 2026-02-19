@@ -7,8 +7,10 @@ import { ClimbingBoxLoader } from "react-spinners";
 import Loading from "@/components/Loader";
 
 export default function Layout() {
-  const token = localStorage.getItem("commuta_token");
-  if (!token) {
+  // const token = localStorage.getItem("commuta_token");
+
+  // replace false with !token
+  if (false) {
     return <Navigate to="/login" replace />;
   }
 

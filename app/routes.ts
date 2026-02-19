@@ -10,14 +10,15 @@ export default [
   // Dashboard layout for all admin pages
   layout("routes/layout.tsx", [
     route("admin/dashboard", "routes/dashboard.tsx"),
-    route("admin/riders", "routes/riders.tsx"),
-    route("admin/riders/:id", "routes/riders-details.tsx"),
-    route("admin/drivers", "routes/drivers.tsx"),
-    route("admin/drivers/:id", "routes/drivers-details.tsx"),
-    route("admin/trips", "routes/trips.tsx"),
-    route("admin/trips/:rideId", "routes/trip-details.tsx"),
-    route("admin/forum", "routes/forum.tsx"),
-    route("admin/payouts", "routes/payouts.tsx"),
-    route("admin/contacts", "routes/contacts.tsx"),
+    route("admin/users", "routes/user-dir.tsx"),
+    // route("admin/riders/:id", "routes/riders-details.tsx"),
+    route("admin/verification", "routes/verification-queue.tsx"),
+    // route("admin/drivers/:id", "routes/drivers-details.tsx"),
+    route("admin/deals", "routes/deal-room.tsx"),
+    // route("admin/trips/:rideId", "routes/trip-details.tsx"),
+    route("admin/content", "routes/content-engagement.tsx"),
+    route("admin/system", "routes/system-mangement.tsx"),
+    // route("admin/contacts", "routes/contacts.tsx"),
   ]),
 ] satisfies RouteConfig;
+
