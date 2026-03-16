@@ -560,30 +560,23 @@ export default function ContentEngagementPage() {
                 </p>
               ) : (
                 events.map((event) => (
-                  <Card key={event.eventId} className="overflow-hidden">
+                  <Card key={event.eventId}>
                     {event.coverImageUrl ? (
                       <img
                         src={event.coverImageUrl}
                         alt={event.name}
-                        className="h-32 w-full object-cover"
+                        className="h-32 w-full object-cover rounded-t-lg"
                       />
                     ) : (
-                      <div className="h-32 bg-slate-200 rounded-t-lg flex items-center justify-center">
-                        <CalendarIcon className="h-8 w-8 text-slate-400" />
-                      </div>
+                      <div className="h-32 bg-slate-200 rounded-t-lg animate-pulse" />
                     )}
                     <CardHeader className="p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-[10px]">
-                          {event.type}
-                        </Badge>
-                      </div>
-                      <CardTitle className="text-base line-clamp-1">
+                      <CardTitle className="text-base">
                         {event.name}
                       </CardTitle>
                       <CardDescription>
-                        {format(new Date(event.startTime), "MMM dd, yyyy • h:mm a")}
-                        {event.address ? ` • ${event.address}` : ""}
+                        {format(new Date(event.startTime), "MMM dd")}
+                        {event.address ? ` • ${event.address}` : event.venue ? ` • ${event.venue}` : ""}
                       </CardDescription>
                     </CardHeader>
                   </Card>
