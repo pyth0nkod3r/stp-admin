@@ -3,14 +3,25 @@ export interface LoginPayload {
   password: string;
 }
 
-export interface LoginResponse {
-  status: number;
-  message: string;
-  error: boolean;
+export interface LoginData {
   token: string;
+  tokenType: string;
+  expiresIn: number;
+  userId: string;
+  email: string;
+  name: string;
+  role: string;
+  isOnboarded: boolean;
+  passwordChangeRequired: boolean;
 }
 
-export const API_BASE_URL = "https://api.gocommuta.com/v1/admin";
+export interface LoginResponse {
+  status: boolean;
+  message: string;
+  data: LoginData;
+}
+
+export const API_BASE_URL = "/stp//api/auth";
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   try {
@@ -18,9 +29,9 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json",
       },
       body: JSON.stringify(payload),
+      redirect: "follow",
     });
 
     if (!response.ok) {
@@ -31,10 +42,9 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
     const result: LoginResponse = await response.json();
 
     // Save token in localStorage
-    if (result?.token) {
-      localStorage.setItem("commuta_token", result.token);
+    if (result?.data?.token) {
+      localStorage.setItem("commuta_token", result.data.token);
     }
-
 
     return result;
   } catch (error: any) {

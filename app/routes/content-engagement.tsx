@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   MessageSquare,
   Newspaper,
@@ -15,6 +15,7 @@ import {
   Globe,
   Lock,
   ImageIcon,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -54,9 +55,111 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { createEvent } from "@/services/apiEvents";
+import { TimePicker } from "@/components/ui/time-picker";
+import { useEvents } from "@/hooks/useEvents";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ContentEngagementPage() {
+  const { events, isLoading: eventsLoading } = useEvents();
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [eventLoading, setEventLoading] = useState(false);
+  const [eventForm, setEventForm] = useState({
+    name: "",
+    type: "online",
+    date: undefined as Date | undefined,
+    timeHour: "",
+    timeMinute: "",
+    timePeriod: "AM",
+    location: "",
+    description: "",
+    visibility: "all",
+    rsvpLimit: "",
+  });
+  const coverImageRef = useRef<HTMLInputElement>(null);
+
+  function handleEventChange(field: string, value: string) {
+    setEventForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleCreateEvent() {
+    if (!eventForm.name) {
+      toast.error("Please enter an event name.");
+      return;
+    }
+    if (!eventForm.date) {
+      toast.error("Please select a date.");
+      return;
+    }
+    if (!eventForm.timeHour || !eventForm.timeMinute) {
+      toast.error("Please select hour and minute.");
+      return;
+    }
+    if (!eventForm.description.trim()) {
+      toast.error("Please enter a description.");
+      return;
+    }
+    if (!coverImageRef.current?.files?.[0]) {
+      toast.error("Please upload a cover image.");
+      return;
+    }
+
+    let hour24 = parseInt(eventForm.timeHour);
+    if (eventForm.timePeriod === "AM" && hour24 === 12) hour24 = 0;
+    if (eventForm.timePeriod === "PM" && hour24 !== 12) hour24 += 12;
+
+    const dateStr = format(eventForm.date, "yyyy-MM-dd");
+    const timeStr = `${hour24.toString().padStart(2, "0")}:${eventForm.timeMinute}`;
+    const startTime = `${dateStr}T${timeStr}:00Z`;
+
+    setEventLoading(true);
+    try {
+      const result = await createEvent({
+        name: eventForm.name,
+        startTime,
+        // TODO: No endTime field in UI — defaults to startTime
+        endTime: startTime,
+        address: eventForm.type === "physical" ? eventForm.location : "",
+        type: eventForm.type,
+        timeZone: "UTC",
+        description: eventForm.description,
+        externalLink: eventForm.type === "online" ? eventForm.location : "",
+        // TODO: No "venue" field in UI — sending empty string
+        venue: "",
+        coverImage: coverImageRef.current?.files?.[0],
+      });
+      toast.success(result.message || "Event created successfully!");
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      setEventDialogOpen(false);
+      setEventForm({
+        name: "",
+        type: "online",
+        date: undefined,
+        timeHour: "",
+        timeMinute: "",
+        timePeriod: "AM",
+        location: "",
+        description: "",
+        visibility: "all",
+        rsvpLimit: "",
+      });
+      if (coverImageRef.current) coverImageRef.current.value = "";
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to create event");
+    } finally {
+      setEventLoading(false);
+    }
+  }
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -126,7 +229,7 @@ export default function ContentEngagementPage() {
           </Dialog>
 
           {/* BEEFED UP EVENT MODAL */}
-          <Dialog>
+          <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" /> Create Event
@@ -135,27 +238,119 @@ export default function ContentEngagementPage() {
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Configure Alumni Event</DialogTitle>
+                <DialogDescription>
+                  Set up a new event for the alumni community.
+                </DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-4 py-4">
                 <div className="col-span-2 space-y-2">
                   <Label>Event Name</Label>
-                  <Input placeholder="Alumni Homecoming 2026" />
+                  <Input
+                    placeholder="Alumni Homecoming 2026"
+                    value={eventForm.name}
+                    onChange={(e) => handleEventChange("name", e.target.value)}
+                  />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label>Event Type</Label>
+                  <Select
+                    value={eventForm.type}
+                    onValueChange={(v) => handleEventChange("type", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="online">Online</SelectItem>
+                      <SelectItem value="physical">Physical</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Date</Label>
-                  <Input type="date" />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={`w-full justify-start text-left font-normal ${
+                          !eventForm.date ? "text-muted-foreground" : ""
+                        }`}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {eventForm.date
+                          ? format(eventForm.date, "MMM dd, yyyy")
+                          : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        captionLayout="dropdown"
+                        fromYear={new Date().getFullYear()}
+                        toYear={new Date().getFullYear() + 5}
+                        selected={eventForm.date}
+                        onSelect={(date) =>
+                          setEventForm((prev) => ({ ...prev, date }))
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>Time</Label>
-                  <Input type="time" />
+                  <TimePicker
+                    hour={eventForm.timeHour}
+                    minute={eventForm.timeMinute}
+                    period={eventForm.timePeriod}
+                    onHourChange={(v) => handleEventChange("timeHour", v)}
+                    onMinuteChange={(v) => handleEventChange("timeMinute", v)}
+                    onPeriodChange={(v) => handleEventChange("timePeriod", v)}
+                  />
                 </div>
                 <div className="col-span-2 space-y-2">
-                  <Label>Location / Meeting Link</Label>
-                  <Input placeholder="Physical address or Zoom link" />
+                  <Label>
+                    {eventForm.type === "online"
+                      ? "Meeting Link"
+                      : "Location / Address"}
+                  </Label>
+                  <Input
+                    placeholder={
+                      eventForm.type === "online"
+                        ? "https://zoom.us/j/..."
+                        : "Physical address"
+                    }
+                    value={eventForm.location}
+                    onChange={(e) =>
+                      handleEventChange("location", e.target.value)
+                    }
+                  />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    placeholder="Describe your event..."
+                    className="min-h-[80px]"
+                    value={eventForm.description}
+                    onChange={(e) =>
+                      handleEventChange("description", e.target.value)
+                    }
+                  />
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label>Cover Image</Label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    ref={coverImageRef}
+                    className="cursor-pointer"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Visibility</Label>
-                  <Select defaultValue="all">
+                  <Select
+                    value={eventForm.visibility}
+                    onValueChange={(v) => handleEventChange("visibility", v)}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -173,11 +368,24 @@ export default function ContentEngagementPage() {
                   <Input
                     type="number"
                     placeholder="Leave empty for unlimited"
+                    value={eventForm.rsvpLimit}
+                    onChange={(e) =>
+                      handleEventChange("rsvpLimit", e.target.value)
+                    }
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button className="w-full">Launch Event</Button>
+                <Button
+                  className="w-full"
+                  onClick={handleCreateEvent}
+                  disabled={eventLoading}
+                >
+                  {eventLoading && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Launch Event
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -340,31 +548,68 @@ export default function ContentEngagementPage() {
             </div>
           </div>
 
-          {viewMode === "grid" ? (
+          {eventsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : viewMode === "grid" ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <Card key={i}>
-                  <div className="h-32 bg-slate-200 rounded-t-lg animate-pulse" />
-                  <CardHeader className="p-4">
-                    <CardTitle className="text-base">
-                      Tech Alumni Networking
-                    </CardTitle>
-                    <CardDescription>
-                      March 12 • Victoria Island
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
+              {events.length === 0 ? (
+                <p className="text-muted-foreground col-span-full text-center py-8">
+                  No events yet. Create one to get started.
+                </p>
+              ) : (
+                events.map((event) => (
+                  <Card key={event.eventId}>
+                    {event.coverImageUrl ? (
+                      <img
+                        src={event.coverImageUrl}
+                        alt={event.name}
+                        className="h-32 w-full object-cover rounded-t-lg"
+                      />
+                    ) : (
+                      <div className="h-32 bg-slate-200 rounded-t-lg animate-pulse" />
+                    )}
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-base">
+                        {event.name}
+                      </CardTitle>
+                      <CardDescription>
+                        {format(new Date(event.startTime), "MMM dd")}
+                        {event.address ? ` • ${event.address}` : event.venue ? ` • ${event.venue}` : ""}
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                ))
+              )}
             </div>
           ) : (
             <Card className="p-6">
               <div className="flex items-center justify-between mb-8">
-                <h3 className="font-bold">February 2026</h3>
+                <h3 className="font-bold">
+                  {format(calendarMonth, "MMMM yyyy")}
+                </h3>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="outline">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() =>
+                      setCalendarMonth(
+                        new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
+                      )
+                    }
+                  >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="outline">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() =>
+                      setCalendarMonth(
+                        new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
+                      )
+                    }
+                  >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -378,19 +623,43 @@ export default function ContentEngagementPage() {
                     {d}
                   </div>
                 ))}
-                {Array.from({ length: 28 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="bg-background min-h-[80px] p-2 border-t"
-                  >
-                    <span className="text-xs">{i + 1}</span>
-                    {i === 11 && (
-                      <div className="mt-1 p-1 bg-blue-100 text-blue-700 text-[10px] rounded truncate">
-                        Networking
+                {(() => {
+                  const year = calendarMonth.getFullYear();
+                  const month = calendarMonth.getMonth();
+                  const firstDay = new Date(year, month, 1).getDay();
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const cells = [];
+
+                  // Empty cells before the 1st
+                  for (let i = 0; i < firstDay; i++) {
+                    cells.push(
+                      <div key={`empty-${i}`} className="bg-background min-h-[80px] p-2 border-t" />
+                    );
+                  }
+
+                  for (let day = 1; day <= daysInMonth; day++) {
+                    const dayEvents = events.filter((e) => {
+                      const d = new Date(e.startTime);
+                      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+                    });
+                    cells.push(
+                      <div key={day} className="bg-background min-h-[80px] p-2 border-t">
+                        <span className="text-xs">{day}</span>
+                        {dayEvents.map((e) => (
+                          <div
+                            key={e.eventId}
+                            className="mt-1 p-1 bg-blue-100 text-blue-700 text-[10px] rounded truncate"
+                            title={e.name}
+                          >
+                            {e.name}
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                ))}
+                    );
+                  }
+
+                  return cells;
+                })()}
               </div>
             </Card>
           )}

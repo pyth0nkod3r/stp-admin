@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from "react";
-import { 
-  MoreHorizontal, 
-  Search, 
-  UserPlus, 
-  GraduationCap, 
-  ShieldCheck, 
+import {
+  MoreHorizontal,
+  Search,
+  UserPlus,
+  GraduationCap,
+  ShieldCheck,
   Mail,
   Trash2,
   ExternalLink,
-  Filter
-} from "lucide-react"; // or lucide-react
+  Filter,
+  Loader2
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,40 +30,93 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
-
-// Initial Mock Data
-const INITIAL_DATA = [
-  { id: 1, name: "Alice Johnson", email: "alice.j@alumni.edu", class: "2018", major: "Computer Science", status: "Verified" },
-  { id: 2, name: "Bob Smith", email: "bob.smith@gmail.com", class: "2020", major: "Mechanical Engineering", status: "Pending" },
-  { id: 3, name: "Charlie Davis", email: "charlie.d@outlook.com", class: "2015", major: "Business Admin", status: "Verified" },
-  { id: 4, name: "Diana Prince", email: "diana.p@alumni.edu", class: "2022", major: "Law", status: "Verified" },
-  { id: 5, name: "Edward Norton", email: "ed.norton@tech.com", class: "2019", major: "Psychology", status: "Flagged" },
-];
+import { useUsers } from "@/hooks/useUsers";
+import { createUser } from "@/services/apiUsers";
+import { useQueryClient } from "@tanstack/react-query";
+import type { User } from "@/lib/type";
 
 export default function UserDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [alumni, setAlumni] = useState(INITIAL_DATA);
+  const [page, setPage] = useState(1);
+  const perPage = 10;
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", emailAddress: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: usersResponse, isLoading, error, hasNextPage } = useUsers(page, perPage);
+  const users = usersResponse?.data ?? [];
 
   // Real-time Search Functionality
-  const filteredAlumni = useMemo(() => {
-    return alumni.filter((person) =>
-      Object.values(person).some((val) =>
-        val.toString().toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
-  }, [searchTerm, alumni]);
+  const filteredUsers = useMemo(() => {
+    return users.filter((person) => {
+      const searchable = [
+        person.firstName,
+        person.lastName,
+        person.email,
+        person.role,
+      ];
+      return searchable.some((val) =>
+        val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
+  }, [searchTerm, users]);
 
-  const handleDelete = (id: number) => {
-    setAlumni(alumni.filter(a => a.id !== id));
-    toast.error("Alumni record removed locally");
+  const verifiedCount = users.filter((u) => u.isVerified).length;
+  const pendingCount = users.filter((u) => !u.isVerified).length;
+
+  // TODO: Implement delete via API endpoint
+  const handleDelete = (userId: string) => {
+    toast.error("Delete not yet connected to API");
   };
 
-  const handleVerify = (id: number) => {
-    setAlumni(alumni.map(a => a.id === id ? { ...a, status: "Verified" } : a));
-    toast.success("User verified!");
+  // TODO: Implement verify via API endpoint
+  const handleVerify = (userId: string) => {
+    toast.success("Verify not yet connected to API");
+  };
+
+  const handleAddAlumni = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.firstName || !addForm.lastName || !addForm.emailAddress) {
+      toast.error("All fields are required");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await createUser(addForm);
+      toast.success("Alumni added successfully");
+      setAddForm({ firstName: "", lastName: "", emailAddress: "" });
+      setAddOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add alumni");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getInitials = (firstName: string, lastName: string) => {
+    return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase();
+  };
+
+  const getStatus = (user: User) => {
+    if (user.isVerified) return "Verified";
+    // TODO: Map additional statuses (e.g., isLocked → "Flagged")
+    return "Pending";
   };
 
   return (
@@ -73,16 +127,67 @@ export default function UserDirectoryPage() {
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Alumni Directory</h2>
           <p className="text-muted-foreground text-sm">Manage and verify your university alumni network.</p>
         </div>
-        <Button className="w-full md:w-auto">
-          <UserPlus className="mr-2 h-4 w-4" /> Add Alumni
-        </Button>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogTrigger asChild>
+            <Button className="w-full md:w-auto">
+              <UserPlus className="mr-2 h-4 w-4" /> Add Alumni
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Alumni</DialogTitle>
+              <DialogDescription>
+                Fill in the details below to add a new alumni to the directory.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAddAlumni} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  placeholder="Enter first name"
+                  value={addForm.firstName}
+                  onChange={(e) => setAddForm((f) => ({ ...f, firstName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  placeholder="Enter last name"
+                  value={addForm.lastName}
+                  onChange={(e) => setAddForm((f) => ({ ...f, lastName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="emailAddress">Email Address</Label>
+                <Input
+                  id="emailAddress"
+                  type="email"
+                  placeholder="Enter email address"
+                  value={addForm.emailAddress}
+                  onChange={(e) => setAddForm((f) => ({ ...f, emailAddress: e.target.value }))}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Add Alumni
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Stats Cards - Horizontal Scroll on Mobile */}
+      {/* Stats Cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Alumni" value={alumni.length} icon={<GraduationCap />} sub="Live count" />
-        <StatCard title="Verified" value={alumni.filter(a => a.status === "Verified").length} icon={<ShieldCheck />} sub="Active members" />
-        <StatCard title="Pending" value={alumni.filter(a => a.status === "Pending").length} icon={<Mail />} sub="Requires action" color="text-orange-500" />
+        <StatCard title="Total Alumni" value={users.length} icon={<GraduationCap />} sub="Live count" />
+        <StatCard title="Verified" value={verifiedCount} icon={<ShieldCheck />} sub="Active members" />
+        <StatCard title="Pending" value={pendingCount} icon={<Mail />} sub="Requires action" color="text-orange-500" />
       </div>
 
       <Card className="overflow-hidden">
@@ -90,9 +195,9 @@ export default function UserDirectoryPage() {
           <div className="flex flex-col md:flex-row gap-4 justify-between">
             <div className="relative w-full md:w-72">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search alumni..." 
-                className="pl-9" 
+              <Input
+                placeholder="Search alumni..."
+                className="pl-9"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -111,37 +216,60 @@ export default function UserDirectoryPage() {
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-[250px]">Alumni</TableHead>
+                  {/* TODO: Add "Class" column when API provides graduation year */}
                   <TableHead className="hidden md:table-cell">Class</TableHead>
+                  {/* TODO: Add "Major" column when API provides major/department */}
                   <TableHead className="hidden lg:table-cell">Major</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAlumni.length > 0 ? (
-                  filteredAlumni.map((person) => (
-                    <TableRow key={person.id} className="hover:bg-muted/30 transition-colors">
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading users...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                      Failed to load users. Please try again.
+                    </TableCell>
+                  </TableRow>
+                ) : filteredUsers.length > 0 ? (
+                  filteredUsers.map((person) => (
+                    <TableRow key={person.userId} className="hover:bg-muted/30 transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 border">
                             <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {person.name.split(' ').map(n => n[0]).join('')}
+                              {getInitials(person.firstName, person.lastName)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex flex-col min-w-0">
-                            <span className="font-medium truncate text-sm sm:text-base">{person.name}</span>
-                            <span className="text-xs text-muted-foreground truncate hidden sm:block">{person.email}</span>
+                            <span className="font-medium truncate text-sm sm:text-base">
+                              {person.firstName} {person.lastName}
+                            </span>
+                            <span className="text-xs text-muted-foreground truncate hidden sm:block">
+                              {person.email}
+                            </span>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">{person.class}</TableCell>
-                      <TableCell className="hidden lg:table-cell text-muted-foreground">{person.major}</TableCell>
+                      {/* TODO: Replace with actual graduation class when available from API */}
+                      <TableCell className="hidden md:table-cell text-muted-foreground">—</TableCell>
+                      {/* TODO: Replace with actual major when available from API */}
+                      <TableCell className="hidden lg:table-cell text-muted-foreground">—</TableCell>
                       <TableCell>
                         <Badge variant={
-                          person.status === "Verified" ? "default" : 
-                          person.status === "Pending" ? "secondary" : "destructive"
+                          getStatus(person) === "Verified" ? "default" :
+                          getStatus(person) === "Pending" ? "secondary" : "destructive"
                         } className="text-[10px] sm:text-xs">
-                          {person.status}
+                          {getStatus(person)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -156,18 +284,18 @@ export default function UserDirectoryPage() {
                             <DropdownMenuItem className="cursor-pointer">
                               <ExternalLink className="mr-2 h-4 w-4" /> View Profile
                             </DropdownMenuItem>
-                            {person.status !== "Verified" && (
-                              <DropdownMenuItem 
+                            {!person.isVerified && (
+                              <DropdownMenuItem
                                 className="cursor-pointer text-blue-600"
-                                onClick={() => handleVerify(person.id)}
+                                onClick={() => handleVerify(person.userId)}
                               >
                                 <ShieldCheck className="mr-2 h-4 w-4" /> Verify
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-destructive cursor-pointer"
-                              onClick={() => handleDelete(person.id)}
+                              onClick={() => handleDelete(person.userId)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>
@@ -186,8 +314,45 @@ export default function UserDirectoryPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination - only show when there are multiple pages */}
+          {!isLoading && !error && (page > 1 || hasNextPage) && (
+            <div className="flex items-center justify-end gap-2 py-4 px-2">
+              {page > 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Previous
+                </Button>
+              )}
+              <span className="text-sm text-muted-foreground">Page {page}</span>
+              {hasNextPage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/*
+        TODO: The following API response fields are not yet displayed in the UI:
+        - role (USER / BACKOFFICE)
+        - isOnboarded
+        - passwordChangeRequired
+        - isActive
+        - isLocked
+        - lastLogin
+        - createdAt
+        - updatedAt
+      */}
     </div>
   );
 }
