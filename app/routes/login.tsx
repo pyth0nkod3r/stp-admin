@@ -31,27 +31,23 @@ const Login = () => {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  // const { mutate, isPending } = useLogin();
+  const { mutate, isPending } = useLogin();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-     navigate("/admin/dashboard");
 
-//     mutate(
-//       { emailAddress: email, password },
-//       {
-//         onSuccess: (data) => {
-// //           console.log("Logged in:", data);
-//           toast.success("Login successful!");
-//           // redirect user
-//           navigate("/admin/dashboard");
-//           //   window.location.href = "/admin/dashboard";
-//         },
-//         onError: (err: any) => {
-//           toast.error(err.message);
-//         },
-//       }
-//     );
+    mutate(
+      { emailAddress: email, password },
+      {
+        onSuccess: () => {
+          toast.success("Login successful!");
+          navigate("/admin/dashboard");
+        },
+        onError: (err: any) => {
+          toast.error(err.message);
+        },
+      }
+    );
   }
 
   return (
@@ -133,9 +129,9 @@ const Login = () => {
             <Button
               type="submit"
               className="w-full h-11 font-semibold shadow-lg shadow-primary/25 cursor-pointer bg-stp-blue-dark"
-              // disabled={isPending}
+              disabled={isPending}
             >
-              {false ? "Signing in..." : "Sign In"}
+              {isPending ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 
