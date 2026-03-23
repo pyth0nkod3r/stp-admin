@@ -21,7 +21,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useLocation } from "react-router";
 import { NavLink } from "./nav-link";
 import { toast } from "sonner";
@@ -41,6 +41,15 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
 
+  const userName = localStorage.getItem("commuta_user_name") || "Admin";
+  const userEmail = localStorage.getItem("commuta_user_email") || "";
+  const initials = userName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   const isActive = (path: string) => {
     if (path === "/") return currentPath === "/";
     return currentPath.startsWith(path);
@@ -48,6 +57,8 @@ export function AppSidebar() {
 
   function logout() {
     localStorage.removeItem("commuta_token");
+    localStorage.removeItem("commuta_user_name");
+    localStorage.removeItem("commuta_user_email");
     toast.success("Logged out successfully");
     window.location.replace("/login");
   }
@@ -94,17 +105,16 @@ export function AppSidebar() {
         >
           <div className="flex items-center gap-3 overflow-hidden">
             <Avatar className="h-9 w-9 shrink-0">
-              <AvatarImage src="https://github.com/shadcn.png" alt="@user" />
-              <AvatarFallback>JD</AvatarFallback>
+              <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
 
             {open && (
               <div className="flex flex-col items-start min-w-0 transition-opacity duration-300">
                 <span className="text-sm font-medium leading-none truncate w-full">
-                  John Doe
+                  {userName}
                 </span>
                 <span className="text-[10px] text-muted-foreground truncate w-[100px]">
-                  john@example.com
+                  {userEmail}
                 </span>
               </div>
             )}
