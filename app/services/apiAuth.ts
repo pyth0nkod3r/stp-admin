@@ -21,7 +21,7 @@ export interface LoginResponse {
   data: LoginData;
 }
 
-export const API_BASE_URL = "/stp//api/auth";
+export const API_BASE_URL = "/stp/api/auth";
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   try {
