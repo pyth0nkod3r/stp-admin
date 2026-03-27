@@ -1,21 +1,22 @@
-import React from "react";
-import { 
-  Users, 
-  Car, 
-  ShieldAlert, 
-  MousePointer2, 
-  TrendingUp, 
-  ArrowUpRight 
+import { useState, useEffect } from "react";
+import {
+  Users,
+  Car,
+  ShieldAlert,
+  MousePointer2,
+  TrendingUp,
+  ArrowUpRight
 } from "lucide-react";
-     import { MessageSquare, Zap, FileDown, PlusCircle } from "lucide-react";
+import { MessageSquare, Zap, FileDown, PlusCircle } from "lucide-react";
 
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart,
   Bar,
@@ -29,6 +30,9 @@ import {
   Cell,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { fetchDashboardSummary, type DashboardSummary } from "@/services/apiDashboard";
+import { fetchUsers } from "@/services/apiUsers";
+import type { User } from "@/lib/type";
 
 // Mock Data for Charts
 const engagementData = [
@@ -41,12 +45,32 @@ const engagementData = [
   { name: "Sun", clicks: 15 },
 ];
 
-const userData = [
-  { name: "Verified Alumni", value: 850, color: "#0f172a" }, // primary
-  { name: "Guests", value: 320, color: "#94a3b8" }, // muted
-];
-
 export default function AdminOverview() {
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardSummary()
+      .then((res) => setSummary(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+
+    fetchUsers(1, 100)
+      .then((res) => setUsers(res.data))
+      .catch(() => {})
+      .finally(() => setUsersLoading(false));
+  }, []);
+
+  const verifiedCount = users.filter((u) => u.isVerified).length;
+  const pendingCount = users.filter((u) => !u.isVerified).length;
+
+  const userDistribution = [
+    { name: "Verified", value: verifiedCount, color: "#0f172a" },
+    { name: "Pending", value: pendingCount, color: "#f97316" },
+  ];
+
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -55,30 +79,34 @@ export default function AdminOverview() {
 
       {/* Top Level Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard 
-          title="Total Users" 
-          value="1,170" 
-          description="Verified vs Guests" 
-          icon={<Users className="h-4 w-4 text-muted-foreground" />} 
+        <MetricCard
+          title="Total Users"
+          value={summary?.totalUsers ?? null}
+          description="Verified vs Guests"
+          icon={<Users className="h-4 w-4 text-muted-foreground" />}
+          loading={loading}
         />
-        <MetricCard 
-          title="Active Deal Rooms" 
-          value="12" 
-          description="4 closing soon" 
-          icon={<Car className="h-4 w-4 text-muted-foreground" />} 
+        <MetricCard
+          title="Active Deal Rooms"
+          value={summary?.totaldealRooms ?? null}
+          description=""
+          icon={<Car className="h-4 w-4 text-muted-foreground" />}
+          loading={loading}
         />
-        <MetricCard 
-          title="Pending Verifications" 
-          value="28" 
-          description="Needs your attention" 
-          icon={<ShieldAlert className="h-4 w-4 text-orange-500" />} 
+        <MetricCard
+          title="Pending Verifications"
+          value={usersLoading ? null : pendingCount}
+          description="Needs your attention"
+          icon={<ShieldAlert className="h-4 w-4 text-orange-500" />}
           highlight
+          loading={usersLoading}
         />
-        <MetricCard 
-          title="Marketplace Clicks" 
-          value="456" 
-          description="+18% from last week" 
-          icon={<MousePointer2 className="h-4 w-4 text-muted-foreground" />} 
+        <MetricCard
+          title="Marketplace Clicks"
+          value={null}
+          description=""
+          icon={<MousePointer2 className="h-4 w-4 text-muted-foreground" />}
+          loading={false}
         />
       </div>
 
@@ -111,38 +139,46 @@ export default function AdminOverview() {
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>User Distribution</CardTitle>
-            <CardDescription>Verified Alumni vs. Guests</CardDescription>
+            <CardDescription>Verified vs. Pending Verification</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={userData}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {userData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 space-y-2">
-              {userData.map((item) => (
-                <div key={item.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-muted-foreground">{item.name}</span>
-                  </div>
-                  <span className="font-medium">{item.value}</span>
+            {usersLoading ? (
+              <div className="h-[300px] w-full flex items-center justify-center">
+                <Skeleton className="h-40 w-40 rounded-full" />
+              </div>
+            ) : (
+              <>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={userDistribution}
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {userDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div className="mt-4 space-y-2">
+                  {userDistribution.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="text-muted-foreground">{item.name}</span>
+                      </div>
+                      <span className="font-medium">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -230,16 +266,27 @@ export default function AdminOverview() {
   );
 }
 
-function MetricCard({ title, value, description, icon, highlight = false }: any) {
+function MetricCard({ title, value, description, icon, highlight = false, loading = false }: any) {
   return (
     <Card className={highlight ? "border-orange-200 bg-orange-50/30" : ""}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 min-h-[68px]">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {icon}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+        {loading ? (
+          <>
+            <Skeleton className="h-8 w-20 mb-1" />
+            <Skeleton className="h-3 w-28" />
+          </>
+        ) : (
+          <>
+            <div className="text-2xl font-bold leading-8">
+              {value !== null ? value.toLocaleString() : "—"}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 min-h-[16px]">{description}</p>
+          </>
+        )}
       </CardContent>
     </Card>
   );

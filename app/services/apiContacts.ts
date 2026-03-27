@@ -1,10 +1,10 @@
 import type { Contact } from "@/lib/type";
-import { API_BASE_URL } from "./apiAuth";
+import { API_BASE_URL } from "./config";
 
 
 
 export async function getContacts(): Promise<Contact[]> {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (!token) throw new Error("Not authenticated");
 
    const response = await fetch(`${API_BASE_URL}/contacts`, {
@@ -12,8 +12,7 @@ export async function getContacts(): Promise<Contact[]> {
     headers: {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/json",
-      "Content-Type": "application/json", 
-      "Cache-Control": "no-cache",
+      "Content-Type": "application/json",
     
     },
   });

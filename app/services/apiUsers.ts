@@ -1,6 +1,5 @@
 import type { User } from "@/lib/type";
-
-const BACKOFFICE_BASE_URL = "/stp//api/backoffice";
+import { API_BASE_URL } from "./config";
 
 export interface UsersResponse {
   status: boolean;
@@ -12,18 +11,17 @@ export async function fetchUsers(
   page: number = 1,
   perPage: number = 10
 ): Promise<UsersResponse> {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (!token) throw new Error("Not authenticated");
 
   const response = await fetch(
-    `${BACKOFFICE_BASE_URL}/users?page=${page}&perPage=${perPage}`,
+    `${API_BASE_URL}/backoffice/users?page=${page}&perPage=${perPage}`,
     {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
         "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
       },
     }
   );
@@ -44,10 +42,10 @@ export interface CreateUserPayload {
 }
 
 export async function createUser(payload: CreateUserPayload): Promise<void> {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (!token) throw new Error("Not authenticated");
 
-  const response = await fetch(`${BACKOFFICE_BASE_URL}/users/onboard`, {
+  const response = await fetch(`${API_BASE_URL}/backoffice/users/onboard`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

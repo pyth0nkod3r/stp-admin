@@ -21,11 +21,11 @@ export interface LoginResponse {
   data: LoginData;
 }
 
-export const API_BASE_URL = "https://app.gfa-tech.com/stp/api/auth";
+import { API_BASE_URL } from "./config";
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -41,9 +41,11 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
 
     const result: LoginResponse = await response.json();
 
-    // Save token in localStorage
+    // Save token and user info in localStorage
     if (result?.data?.token) {
-      localStorage.setItem("commuta_token", result.data.token);
+      localStorage.setItem("stp_token", result.data.token);
+      localStorage.setItem("stp_user_name", result.data.name);
+      localStorage.setItem("stp_user_email", result.data.email);
     }
 
     return result;

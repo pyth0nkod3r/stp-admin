@@ -17,13 +17,13 @@ import type { Route } from "../+types/root";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Commuta - Admin Login" },
-    { name: "description", content: "Commuta admin login page" },
+    { title: "Stp Alumni - Admin Login" },
+    { name: "description", content: "Stp Alumnni admin login page" },
   ];
 }
 
 const Login = () => {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (token) return <Navigate to="/admin/dashboard" replace />;
 
   const navigate = useNavigate();
@@ -84,7 +84,7 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="stp@commuta.com"
+                placeholder="stp@stp-alumni.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 bg-background/50 border-border/60 focus:border-primary"

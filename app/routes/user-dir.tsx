@@ -43,7 +43,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { useUsers } from "@/hooks/useUsers";
+import { useUsers, useAllUsers } from "@/hooks/useUsers";
 import { createUser } from "@/services/apiUsers";
 import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@/lib/type";
@@ -61,6 +61,13 @@ export default function UserDirectoryPage() {
   const { data: usersResponse, isLoading, error, hasNextPage } = useUsers(page, perPage);
   const users = usersResponse?.data ?? [];
 
+  // Fetch all users for stat counts (independent of pagination)
+  const { data: allUsersResponse } = useAllUsers();
+  const allUsers = allUsersResponse?.data ?? [];
+  const totalCount = allUsers.length;
+  const verifiedCount = allUsers.filter((u: User) => u.isVerified).length;
+  const pendingCount = allUsers.filter((u: User) => !u.isVerified).length;
+
   // Real-time Search Functionality
   const filteredUsers = useMemo(() => {
     return users.filter((person) => {
@@ -75,9 +82,6 @@ export default function UserDirectoryPage() {
       );
     });
   }, [searchTerm, users]);
-
-  const verifiedCount = users.filter((u) => u.isVerified).length;
-  const pendingCount = users.filter((u) => !u.isVerified).length;
 
   // TODO: Implement delete via API endpoint
   const handleDelete = (userId: string) => {
@@ -102,6 +106,7 @@ export default function UserDirectoryPage() {
       setAddForm({ firstName: "", lastName: "", emailAddress: "" });
       setAddOpen(false);
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["users-all"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to add alumni");
     } finally {
@@ -185,7 +190,7 @@ export default function UserDirectoryPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Alumni" value={users.length} icon={<GraduationCap />} sub="Live count" />
+        <StatCard title="Total Alumni" value={totalCount} icon={<GraduationCap />} sub="Live count" />
         <StatCard title="Verified" value={verifiedCount} icon={<ShieldCheck />} sub="Active members" />
         <StatCard title="Pending" value={pendingCount} icon={<Mail />} sub="Requires action" color="text-orange-500" />
       </div>
