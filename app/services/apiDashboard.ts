@@ -1,4 +1,4 @@
-const DASHBOARD_BASE_URL = "/stp//api/backoffice/dashboard/summary";
+import { API_BASE_URL } from "./config";
 
 export interface DashboardSummary {
   totalUsers: number;
@@ -12,10 +12,10 @@ export interface DashboardResponse {
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardResponse> {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (!token) throw new Error("Not authenticated");
 
-  const response = await fetch(DASHBOARD_BASE_URL, {
+  const response = await fetch(`${API_BASE_URL}/backoffice/dashboard/summary`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,

@@ -31,6 +31,8 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { fetchDashboardSummary, type DashboardSummary } from "@/services/apiDashboard";
+import { fetchUsers } from "@/services/apiUsers";
+import type { User } from "@/lib/type";
 
 // Mock Data for Charts
 const engagementData = [
@@ -43,21 +45,31 @@ const engagementData = [
   { name: "Sun", clicks: 15 },
 ];
 
-const userData = [
-  { name: "Verified Alumni", value: 850, color: "#0f172a" }, // primary
-  { name: "Guests", value: 320, color: "#94a3b8" }, // muted
-];
-
 export default function AdminOverview() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardSummary()
       .then((res) => setSummary(res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    fetchUsers(1, 100)
+      .then((res) => setUsers(res.data))
+      .catch(() => {})
+      .finally(() => setUsersLoading(false));
   }, []);
+
+  const verifiedCount = users.filter((u) => u.isVerified).length;
+  const pendingCount = users.filter((u) => !u.isVerified).length;
+
+  const userDistribution = [
+    { name: "Verified", value: verifiedCount, color: "#0f172a" },
+    { name: "Pending", value: pendingCount, color: "#f97316" },
+  ];
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -83,11 +95,11 @@ export default function AdminOverview() {
         />
         <MetricCard
           title="Pending Verifications"
-          value={null}
+          value={usersLoading ? null : pendingCount}
           description="Needs your attention"
           icon={<ShieldAlert className="h-4 w-4 text-orange-500" />}
           highlight
-          loading={false}
+          loading={usersLoading}
         />
         <MetricCard
           title="Marketplace Clicks"
@@ -127,38 +139,46 @@ export default function AdminOverview() {
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>User Distribution</CardTitle>
-            <CardDescription>Verified Alumni vs. Guests</CardDescription>
+            <CardDescription>Verified vs. Pending Verification</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={userData}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {userData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 space-y-2">
-              {userData.map((item) => (
-                <div key={item.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-muted-foreground">{item.name}</span>
-                  </div>
-                  <span className="font-medium">{item.value}</span>
+            {usersLoading ? (
+              <div className="h-[300px] w-full flex items-center justify-center">
+                <Skeleton className="h-40 w-40 rounded-full" />
+              </div>
+            ) : (
+              <>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={userDistribution}
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {userDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div className="mt-4 space-y-2">
+                  {userDistribution.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="text-muted-foreground">{item.name}</span>
+                      </div>
+                      <span className="font-medium">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

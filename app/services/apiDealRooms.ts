@@ -1,6 +1,6 @@
 import type { DealRoom } from "@/lib/type";
+import { API_BASE_URL } from "./config";
 
-const DEALROOM_BASE_URL = "/stp//api/dealroom";
 
 export interface DealRoomsResponse {
   status: boolean;
@@ -9,10 +9,10 @@ export interface DealRoomsResponse {
 }
 
 export async function fetchDealRooms(): Promise<DealRoomsResponse> {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (!token) throw new Error("Not authenticated");
 
-  const response = await fetch(DEALROOM_BASE_URL, {
+  const response = await fetch(`${API_BASE_URL}/dealroom`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -38,7 +38,7 @@ export interface CreateDealRoomPayload {
 export async function createDealRoom(
   payload: CreateDealRoomPayload
 ): Promise<{ status: boolean; message: string }> {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (!token) throw new Error("Not authenticated");
 
   const formdata = new FormData();
@@ -51,7 +51,7 @@ export async function createDealRoom(
     formdata.append("document", payload.document);
   }
 
-  const response = await fetch(DEALROOM_BASE_URL, {
+  const response = await fetch(`${API_BASE_URL}/dealroom`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

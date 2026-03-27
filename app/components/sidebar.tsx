@@ -41,8 +41,8 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
 
-  const userName = localStorage.getItem("commuta_user_name") || "Admin";
-  const userEmail = localStorage.getItem("commuta_user_email") || "";
+  const userName = localStorage.getItem("stp_user_name") || "Admin";
+  const userEmail = localStorage.getItem("stp_user_email") || "";
   const initials = userName
     .split(" ")
     .map((n) => n[0])
@@ -56,9 +56,9 @@ export function AppSidebar() {
   };
 
   function logout() {
-    localStorage.removeItem("commuta_token");
-    localStorage.removeItem("commuta_user_name");
-    localStorage.removeItem("commuta_user_email");
+    localStorage.removeItem("stp_token");
+    localStorage.removeItem("stp_user_name");
+    localStorage.removeItem("stp_user_email");
     toast.success("Logged out successfully");
     window.location.replace("/login");
   }

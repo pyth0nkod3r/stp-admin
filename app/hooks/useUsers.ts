@@ -19,3 +19,11 @@ export function useUsers(page: number = 1, perPage: number = 10) {
     hasNextPage,
   };
 }
+
+export function useAllUsers() {
+  return useQuery({
+    queryKey: ["users-all"],
+    queryFn: () => fetchUsers(1, 10000),
+    staleTime: 5 * 60 * 1000,
+  });
+}

@@ -1,6 +1,5 @@
 import type { Event } from "@/lib/type";
-
-const EVENTS_BASE_URL = "/stp//api/events";
+import { API_BASE_URL } from "./config";
 
 export interface EventsResponse {
   status: boolean;
@@ -9,7 +8,7 @@ export interface EventsResponse {
 }
 
 export async function fetchEvents(): Promise<EventsResponse> {
-  const response = await fetch(EVENTS_BASE_URL, {
+  const response = await fetch(`${API_BASE_URL}/events`, {
     method: "GET",
     redirect: "follow",
   });
@@ -52,10 +51,10 @@ export interface EventDetailResponse {
 export async function fetchEventById(
   eventId: string
 ): Promise<EventDetailResponse> {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (!token) throw new Error("Not authenticated");
 
-  const response = await fetch(`${EVENTS_BASE_URL}/${eventId}`, {
+  const response = await fetch(`${API_BASE_URL}/events/${eventId}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -74,7 +73,7 @@ export async function fetchEventById(
 export async function createEvent(
   payload: CreateEventPayload
 ): Promise<CreateEventResponse> {
-  const token = localStorage.getItem("commuta_token");
+  const token = localStorage.getItem("stp_token");
   if (!token) throw new Error("Not authenticated");
 
   const formdata = new FormData();
@@ -92,7 +91,7 @@ export async function createEvent(
     formdata.append("coverImage", payload.coverImage);
   }
 
-  const response = await fetch(EVENTS_BASE_URL, {
+  const response = await fetch(`${API_BASE_URL}/events`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
