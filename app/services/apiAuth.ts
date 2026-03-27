@@ -41,9 +41,11 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
 
     const result: LoginResponse = await response.json();
 
-    // Save token in localStorage
+    // Save token and user info in localStorage
     if (result?.data?.token) {
       localStorage.setItem("commuta_token", result.data.token);
+      localStorage.setItem("commuta_user_name", result.data.name);
+      localStorage.setItem("commuta_user_email", result.data.email);
     }
 
     return result;

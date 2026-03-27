@@ -43,6 +43,34 @@ export interface CreateEventResponse {
   };
 }
 
+export interface EventDetailResponse {
+  status: boolean;
+  message: string;
+  data: Event;
+}
+
+export async function fetchEventById(
+  eventId: string
+): Promise<EventDetailResponse> {
+  const token = localStorage.getItem("commuta_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(`${EVENTS_BASE_URL}/${eventId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to fetch event details");
+  }
+
+  return response.json();
+}
+
 export async function createEvent(
   payload: CreateEventPayload
 ): Promise<CreateEventResponse> {

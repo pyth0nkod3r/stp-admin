@@ -6,3 +6,6 @@
 /.react-router/
 /build/
 .specstory
+.vscode
+.claude
+
