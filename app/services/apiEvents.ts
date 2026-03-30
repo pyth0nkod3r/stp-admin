@@ -42,6 +42,7 @@ export interface CreateEventResponse {
   };
 }
 
+<<<<<<< HEAD
 export interface EventDetailResponse {
   status: boolean;
   message: string;
@@ -70,6 +71,8 @@ export async function fetchEventById(
   return response.json();
 }
 
+=======
+>>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
 export async function createEvent(
   payload: CreateEventPayload
 ): Promise<CreateEventResponse> {

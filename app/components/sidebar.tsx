@@ -21,7 +21,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLocation } from "react-router";
 import { NavLink } from "./nav-link";
 import { toast } from "sonner";
@@ -105,29 +105,30 @@ export function AppSidebar() {
         >
           <div className="flex items-center gap-3 overflow-hidden">
             <Avatar className="h-9 w-9 shrink-0">
-              <AvatarFallback>{initials}</AvatarFallback>
+              <AvatarImage src="https://github.com/shadcn.png" alt="@user" />
+              <AvatarFallback>JD</AvatarFallback>
             </Avatar>
 
             {open && (
               <div className="flex flex-col items-start min-w-0 transition-opacity duration-300">
                 <span className="text-sm font-medium leading-none truncate w-full">
-                  {userName}
+                  John Doe
                 </span>
                 <span className="text-[10px] text-muted-foreground truncate w-[100px]">
-                  {userEmail}
+                  john@example.com
                 </span>
               </div>
             )}
           </div>
 
           {/* {open && ( */}
-            <button
-              onClick={logout}
-              className="p-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md transition-colors"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4 text-muted-foreground" />
-            </button>
+          <button
+            onClick={logout}
+            className="p-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md transition-colors"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4 text-muted-foreground" />
+          </button>
           {/* )} */}
         </div>
       </SidebarFooter>

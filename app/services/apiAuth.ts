@@ -41,11 +41,15 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
 
     const result: LoginResponse = await response.json();
 
-    // Save token and user info in localStorage
+    // Save token in localStorage
     if (result?.data?.token) {
+<<<<<<< HEAD
       localStorage.setItem("stp_token", result.data.token);
       localStorage.setItem("stp_user_name", result.data.name);
       localStorage.setItem("stp_user_email", result.data.email);
+=======
+      localStorage.setItem("commuta_token", result.data.token);
+>>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
     }
 
     return result;

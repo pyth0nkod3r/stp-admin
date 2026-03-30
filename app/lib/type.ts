@@ -186,18 +186,6 @@ export interface Event {
   coverImageUrl: string;
 }
 
-export interface DealRoom {
-  roomId: string;
-  roomName: string;
-  roomDescription: string;
-  isActive: string;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-  totalMembers: string;
-  documentUrl: string;
-}
-
 export interface Contact {
   id: string;
   firstName: string;

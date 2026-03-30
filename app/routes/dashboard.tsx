@@ -1,22 +1,21 @@
-import { useState, useEffect } from "react";
-import {
-  Users,
-  Car,
-  ShieldAlert,
-  MousePointer2,
-  TrendingUp,
-  ArrowUpRight
+import React from "react";
+import { 
+  Users, 
+  Car, 
+  ShieldAlert, 
+  MousePointer2, 
+  TrendingUp, 
+  ArrowUpRight 
 } from "lucide-react";
-import { MessageSquare, Zap, FileDown, PlusCircle } from "lucide-react";
+     import { MessageSquare, Zap, FileDown, PlusCircle } from "lucide-react";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription 
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart,
   Bar,
@@ -30,9 +29,12 @@ import {
   Cell,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+<<<<<<< HEAD
 import { fetchDashboardSummary, type DashboardSummary } from "@/services/apiDashboard";
 import { fetchUsers } from "@/services/apiUsers";
 import type { User } from "@/lib/type";
+=======
+>>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
 
 // Mock Data for Charts
 const engagementData = [
@@ -46,6 +48,7 @@ const engagementData = [
 ];
 
 export default function AdminOverview() {
+<<<<<<< HEAD
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
@@ -71,6 +74,8 @@ export default function AdminOverview() {
     { name: "Pending", value: pendingCount, color: "#f97316" },
   ];
 
+=======
+>>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -79,20 +84,19 @@ export default function AdminOverview() {
 
       {/* Top Level Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Total Users"
-          value={summary?.totalUsers ?? null}
-          description="Verified vs Guests"
-          icon={<Users className="h-4 w-4 text-muted-foreground" />}
-          loading={loading}
+        <MetricCard 
+          title="Total Users" 
+          value="1,170" 
+          description="Verified vs Guests" 
+          icon={<Users className="h-4 w-4 text-muted-foreground" />} 
         />
-        <MetricCard
-          title="Active Deal Rooms"
-          value={summary?.totaldealRooms ?? null}
-          description=""
-          icon={<Car className="h-4 w-4 text-muted-foreground" />}
-          loading={loading}
+        <MetricCard 
+          title="Active Deal Rooms" 
+          value="12" 
+          description="4 closing soon" 
+          icon={<Car className="h-4 w-4 text-muted-foreground" />} 
         />
+<<<<<<< HEAD
         <MetricCard
           title="Pending Verifications"
           value={usersLoading ? null : pendingCount}
@@ -100,13 +104,20 @@ export default function AdminOverview() {
           icon={<ShieldAlert className="h-4 w-4 text-orange-500" />}
           highlight
           loading={usersLoading}
+=======
+        <MetricCard 
+          title="Pending Verifications" 
+          value="28" 
+          description="Needs your attention" 
+          icon={<ShieldAlert className="h-4 w-4 text-orange-500" />} 
+          highlight
+>>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
         />
-        <MetricCard
-          title="Marketplace Clicks"
-          value={null}
-          description=""
-          icon={<MousePointer2 className="h-4 w-4 text-muted-foreground" />}
-          loading={false}
+        <MetricCard 
+          title="Marketplace Clicks" 
+          value="456" 
+          description="+18% from last week" 
+          icon={<MousePointer2 className="h-4 w-4 text-muted-foreground" />} 
         />
       </div>
 
@@ -266,27 +277,16 @@ export default function AdminOverview() {
   );
 }
 
-function MetricCard({ title, value, description, icon, highlight = false, loading = false }: any) {
+function MetricCard({ title, value, description, icon, highlight = false }: any) {
   return (
     <Card className={highlight ? "border-orange-200 bg-orange-50/30" : ""}>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 min-h-[68px]">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {icon}
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <>
-            <Skeleton className="h-8 w-20 mb-1" />
-            <Skeleton className="h-3 w-28" />
-          </>
-        ) : (
-          <>
-            <div className="text-2xl font-bold leading-8">
-              {value !== null ? value.toLocaleString() : "—"}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 min-h-[16px]">{description}</p>
-          </>
-        )}
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </CardContent>
     </Card>
   );

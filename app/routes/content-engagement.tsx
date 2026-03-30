@@ -16,11 +16,6 @@ import {
   Lock,
   ImageIcon,
   Loader2,
-  MapPin,
-  Clock,
-  Link as LinkIcon,
-  User,
-  Eye,
 } from "lucide-react";
 import {
   Card,
@@ -70,7 +65,6 @@ import { format } from "date-fns";
 import { createEvent } from "@/services/apiEvents";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useEvents } from "@/hooks/useEvents";
-import { useEventDetails } from "@/hooks/useEventDetails";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function ContentEngagementPage() {
@@ -79,12 +73,6 @@ export default function ContentEngagementPage() {
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const {
-    event: eventDetail,
-    isLoading: detailLoading,
-  } = useEventDetails(detailDialogOpen ? selectedEventId : null);
   const [eventLoading, setEventLoading] = useState(false);
   const [eventForm, setEventForm] = useState({
     name: "",
@@ -572,14 +560,7 @@ export default function ContentEngagementPage() {
                 </p>
               ) : (
                 events.map((event) => (
-                  <Card
-                    key={event.eventId}
-                    className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-                    onClick={() => {
-                      setSelectedEventId(event.eventId);
-                      setDetailDialogOpen(true);
-                    }}
-                  >
+                  <Card key={event.eventId}>
                     {event.coverImageUrl ? (
                       <img
                         src={event.coverImageUrl}
@@ -590,12 +571,9 @@ export default function ContentEngagementPage() {
                       <div className="h-32 bg-slate-200 rounded-t-lg animate-pulse" />
                     )}
                     <CardHeader className="p-4">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">
-                          {event.name}
-                        </CardTitle>
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                      </div>
+                      <CardTitle className="text-base">
+                        {event.name}
+                      </CardTitle>
                       <CardDescription>
                         {format(new Date(event.startTime), "MMM dd")}
                         {event.address ? ` • ${event.address}` : event.venue ? ` • ${event.venue}` : ""}
@@ -670,12 +648,8 @@ export default function ContentEngagementPage() {
                         {dayEvents.map((e) => (
                           <div
                             key={e.eventId}
-                            className="mt-1 p-1 bg-blue-100 text-blue-700 text-[10px] rounded truncate cursor-pointer hover:bg-blue-200 transition-colors"
+                            className="mt-1 p-1 bg-blue-100 text-blue-700 text-[10px] rounded truncate"
                             title={e.name}
-                            onClick={() => {
-                              setSelectedEventId(e.eventId);
-                              setDetailDialogOpen(true);
-                            }}
                           >
                             {e.name}
                           </div>
@@ -804,130 +778,6 @@ export default function ContentEngagementPage() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* EVENT DETAILS DIALOG */}
-      <Dialog
-        open={detailDialogOpen}
-        onOpenChange={(open) => {
-          setDetailDialogOpen(open);
-          if (!open) setSelectedEventId(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-[480px] h-[90vh] overflow-y-auto overflow-x-hidden p-5 scrollbar-hide">
-          {detailLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : eventDetail ? (
-            <div className="overflow-hidden min-w-0">
-              <DialogHeader className="pb-1">
-                <DialogTitle className="text-lg">
-                  {eventDetail.name}
-                </DialogTitle>
-                <DialogDescription>
-                  <Badge variant="outline" className="capitalize text-xs px-2 py-0.5">
-                    {eventDetail.type}
-                  </Badge>
-                </DialogDescription>
-              </DialogHeader>
-
-              {eventDetail.coverImageUrl && (
-                <div className="mt-3 rounded-lg overflow-hidden">
-                  <img
-                    src={eventDetail.coverImageUrl}
-                    alt={eventDetail.name}
-                    className="w-full h-72 object-cover"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-3 pt-3 min-w-0">
-                <div className="flex items-start gap-2.5">
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Date & Time</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(eventDetail.startTime), "EEEE, MMMM dd, yyyy")}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(eventDetail.startTime), "hh:mm a")}
-                      {eventDetail.endTime &&
-                        eventDetail.endTime !== eventDetail.startTime &&
-                        ` — ${format(new Date(eventDetail.endTime), "hh:mm a")}`}
-                      {eventDetail.timeZone && ` (${eventDetail.timeZone})`}
-                    </p>
-                  </div>
-                </div>
-
-                {(eventDetail.address || eventDetail.venue || eventDetail.externalLink) && (
-                  <div className="flex items-start gap-2.5">
-                    {eventDetail.type === "online" ? (
-                      <LinkIcon className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                    ) : (
-                      <MapPin className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">
-                        {eventDetail.type === "online" ? "Meeting Link" : "Location"}
-                      </p>
-                      {eventDetail.address && (
-                        <p className="text-sm text-muted-foreground">{eventDetail.address}</p>
-                      )}
-                      {eventDetail.venue && (
-                        <p className="text-sm text-muted-foreground">{eventDetail.venue}</p>
-                      )}
-                      {eventDetail.externalLink && (
-                        <a
-                          href={eventDetail.externalLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline break-all"
-                        >
-                          {eventDetail.externalLink}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {eventDetail.description && (
-                  <div className="flex items-start gap-2.5">
-                    <FileBox className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">Description</p>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {eventDetail.description}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-2.5">
-                  <User className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Created By</p>
-                    <p className="text-sm text-muted-foreground">{eventDetail.createdBy}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <Clock className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Created</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(eventDetail.createdAt), "MMM dd, yyyy 'at' hh:mm a")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="py-6 text-center text-xs text-muted-foreground">
-              Event not found.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
