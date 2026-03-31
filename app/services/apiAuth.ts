@@ -1,3 +1,6 @@
+import { API_BASE_URL } from "./config";
+
+
 export interface LoginPayload {
   emailAddress: string;
   password: string;
@@ -21,7 +24,6 @@ export interface LoginResponse {
   data: LoginData;
 }
 
-import { API_BASE_URL } from "./config";
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
   try {
@@ -43,13 +45,9 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
 
     // Save token in localStorage
     if (result?.data?.token) {
-<<<<<<< HEAD
       localStorage.setItem("stp_token", result.data.token);
       localStorage.setItem("stp_user_name", result.data.name);
       localStorage.setItem("stp_user_email", result.data.email);
-=======
-      localStorage.setItem("commuta_token", result.data.token);
->>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
     }
 
     return result;

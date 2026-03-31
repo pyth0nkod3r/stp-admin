@@ -14,7 +14,7 @@ export default [
     // route("admin/riders/:id", "routes/riders-details.tsx"),
     route("admin/verification", "routes/verification-queue.tsx"),
     // route("admin/drivers/:id", "routes/drivers-details.tsx"),
-    route("admin/deals", "routes/deal-room.tsx"),
+    route("admin/opportunities", "routes/opportunities.tsx"),
     // route("admin/trips/:rideId", "routes/trip-details.tsx"),
     route("admin/content", "routes/content-engagement.tsx"),
     route("admin/system", "routes/system-mangement.tsx"),

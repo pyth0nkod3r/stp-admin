@@ -18,6 +18,7 @@ import { useNavigation } from "react-router";
 import { Spinner } from "@/components/ui/spinner";
 
 export const links: Route.LinksFunction = () => [
+  { rel: "icon", type: "image/png", href: "/favicon.png" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",

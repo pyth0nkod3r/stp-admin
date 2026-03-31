@@ -1,9 +1,13 @@
 import {
   LayoutDashboard,
   Users,
-  Car,
+  Briefcase,
+  GraduationCap,
   DollarSign,
   MessageSquare,
+  Megaphone,
+  Settings,
+  ShieldCheck,
   UserCircle,
   LogOut,
   Contact,
@@ -29,10 +33,10 @@ import { toast } from "sonner";
 const mainItems = [
   { title: "Overview", url: "/admin/dashboard", icon: LayoutDashboard },
   { title: "User Directory", url: "/admin/users", icon: Users },
-  { title: "Verification Queue", url: "/admin/verification", icon: UserCircle },
-  { title: "Deal Rooms", url: "/admin/deals", icon: Car },
-  { title: "Content & Engagement", url: "/admin/content", icon: DollarSign },
-  { title: "System & Management", url: "/admin/system", icon: MessageSquare },
+  { title: "Verification Queue", url: "/admin/verification", icon: ShieldCheck },
+  { title: "Opportunities", url: "/admin/opportunities", icon: Briefcase },
+  { title: "Content & Engagement", url: "/admin/content", icon: Megaphone },
+  { title: "System & Management", url: "/admin/system", icon: Settings },
   // { title: "Contacts", url: "/admin/contacts", icon: Contact },
 ];
 
@@ -66,14 +70,17 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <div className={`${open ? "px-6" : "mx-auto"} py-6`}>
-          <h2 className="text-xl font-bold text-sidebar-primary">
-            {open ? "Stp" : <Car className="w-6 h-6 text-sidebar-primary" />}
-          </h2>
+        <div className={`${open ? "px-6" : "mx-auto"} py-6 flex items-center gap-3`}>
+          <img src="/logo.png" alt="STP Alumni Logo" className={open ? "w-10 h-10 object-contain drop-shadow" : "w-8 h-8 object-contain drop-shadow"} />
           {open && (
-            <p className="text-xs text-sidebar-foreground/70 mt-1">
-              Admin Dashboard
-            </p>
+            <div>
+              <h2 className="text-xl font-bold text-sidebar-primary leading-tight">
+                STP Alumni Network
+              </h2>
+              <p className="text-xs text-sidebar-foreground/70 mt-1">
+                Admin Dashboard
+              </p>
+            </div>
           )}
         </div>
 
@@ -105,17 +112,17 @@ export function AppSidebar() {
         >
           <div className="flex items-center gap-3 overflow-hidden">
             <Avatar className="h-9 w-9 shrink-0">
-              <AvatarImage src="https://github.com/shadcn.png" alt="@user" />
-              <AvatarFallback>JD</AvatarFallback>
+              <AvatarImage src={`https://i.pravatar.cc/150?u=${userEmail}`} alt={userName} />
+              <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
 
             {open && (
               <div className="flex flex-col items-start min-w-0 transition-opacity duration-300">
                 <span className="text-sm font-medium leading-none truncate w-full">
-                  John Doe
+                  {userName}
                 </span>
                 <span className="text-[10px] text-muted-foreground truncate w-[100px]">
-                  john@example.com
+                  {userEmail}
                 </span>
               </div>
             )}

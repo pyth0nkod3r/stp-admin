@@ -6,3 +6,5 @@
 /.react-router/
 /build/
 .specstory
+.vscode
+.kilocode

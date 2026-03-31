@@ -27,16 +27,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
-export default function DealRoomsPage() {
+export default function OpportunitiesPage() {
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Opportunity Module</h2>
-          <p className="text-muted-foreground">Oversee private deal rooms, investments, and partnerships.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Alumni Opportunities</h2>
+          <p className="text-muted-foreground">Oversee private opportunities, investments, and partnerships.</p>
         </div>
         <Button>
-          <Plus className="h-4 w-4 mr-2" /> Create New Deal Room
+          <Plus className="h-4 w-4 mr-2" /> Post New Opportunity
         </Button>
       </div>
 
@@ -76,14 +76,14 @@ export default function DealRoomsPage() {
 
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="active">Active Rooms</TabsTrigger>
+          <TabsTrigger value="active">Active Opportunities</TabsTrigger>
           <TabsTrigger value="requests">Access Requests</TabsTrigger>
           <TabsTrigger value="archived">Archived</TabsTrigger>
         </TabsList>
 
         <TabsContent value="active" className="grid gap-4 md:grid-cols-2">
-          {/* Example Deal Room Card 1 */}
-          <DealRoomCard 
+          {/* Example Opportunity Card 1 */}
+          <OpportunityCard 
             title="Tech Hub Lagos: Seed Round"
             owner="Adebayo C. (Class of '14)"
             status="Active"
@@ -92,8 +92,8 @@ export default function DealRoomsPage() {
             valuation="$500k"
             category="Fintech"
           />
-          {/* Example Deal Room Card 2 */}
-          <DealRoomCard 
+          {/* Example Opportunity Card 2 */}
+          <OpportunityCard 
             title="Renewable Energy JV"
             owner="Sarah Jenkins (Class of '09)"
             status="Private"
@@ -108,7 +108,7 @@ export default function DealRoomsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Access Requests</CardTitle>
-              <CardDescription>Review alumni asking for permission to enter private deal rooms.</CardDescription>
+              <CardDescription>Review alumni asking for permission to access private opportunities.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -140,7 +140,7 @@ export default function DealRoomsPage() {
   );
 }
 
-function DealRoomCard({ title, owner, status, members, progress, valuation, category }: any) {
+function OpportunityCard({ title, owner, status, members, progress, valuation, category }: any) {
   return (
     <Card className="hover:border-primary/50 transition-all">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
@@ -160,11 +160,11 @@ function DealRoomCard({ title, owner, status, members, progress, valuation, cate
             <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem><ArrowUpRight className="h-4 w-4 mr-2"/> View Live Room</DropdownMenuItem>
+            <DropdownMenuItem><ArrowUpRight className="h-4 w-4 mr-2"/> View Live Opportunity</DropdownMenuItem>
             <DropdownMenuItem><Users className="h-4 w-4 mr-2"/> Manage Members</DropdownMenuItem>
             <DropdownMenuItem><MessageSquare className="h-4 w-4 mr-2"/> View Q&A Log</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Close Deal Room</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive">Close Opportunity</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>

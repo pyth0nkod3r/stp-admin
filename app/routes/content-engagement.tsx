@@ -71,6 +71,8 @@ export default function ContentEngagementPage() {
   const { events, isLoading: eventsLoading } = useEvents();
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
+  const [eventStatusFilter, setEventStatusFilter] = useState("all");
+  const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [eventLoading, setEventLoading] = useState(false);
@@ -160,6 +162,13 @@ export default function ContentEngagementPage() {
       setEventLoading(false);
     }
   }
+
+  const filteredEvents = events.filter((e) => {
+    if (eventStatusFilter !== "all" && e.eventStatus !== eventStatusFilter) return false;
+    if (eventTypeFilter !== "all" && e.type !== eventTypeFilter) return false;
+    return true;
+  });
+
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -529,7 +538,39 @@ export default function ContentEngagementPage() {
         </TabsContent>
         {/* --- EVENTS: Grid & Calendar View --- */}
         <TabsContent value="events" className="space-y-4">
-          <div className="flex justify-end mb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <div className="flex flex-wrap items-center gap-2 border rounded-md p-1 bg-muted/50 w-full sm:w-auto">
+              <Select value={eventStatusFilter} onValueChange={setEventStatusFilter}>
+                <SelectTrigger className="h-8 border-0 bg-transparent shadow-none focus:ring-0 w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
+                <SelectTrigger className="h-8 border-0 bg-transparent shadow-none focus:ring-0 w-[120px]">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="physical">Physical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex flex-1 items-center justify-center gap-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                <span className="w-3 h-3 rounded-full bg-blue-500"></span> Approved
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                <span className="w-3 h-3 rounded-full bg-amber-500"></span> Pending
+              </div>
+            </div>
+
             <div className="inline-flex border rounded-md p-1 bg-muted">
               <Button
                 variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -554,30 +595,48 @@ export default function ContentEngagementPage() {
             </div>
           ) : viewMode === "grid" ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {events.length === 0 ? (
+              {filteredEvents.length === 0 ? (
                 <p className="text-muted-foreground col-span-full text-center py-8">
-                  No events yet. Create one to get started.
+                  No events found.
                 </p>
               ) : (
-                events.map((event) => (
-                  <Card key={event.eventId}>
-                    {event.coverImageUrl ? (
-                      <img
-                        src={event.coverImageUrl}
-                        alt={event.name}
-                        className="h-32 w-full object-cover rounded-t-lg"
-                      />
-                    ) : (
-                      <div className="h-32 bg-slate-200 rounded-t-lg animate-pulse" />
-                    )}
+                filteredEvents.map((event) => (
+                  <Card key={event.eventId} className="overflow-hidden">
+                    <div className="relative">
+                      {event.coverImageUrl ? (
+                        <img
+                          src={event.coverImageUrl}
+                          alt={event.name}
+                          className="h-32 w-full object-cover rounded-t-lg"
+                        />
+                      ) : (
+                        <div className="h-32 bg-slate-200 rounded-t-lg flex items-center justify-center">
+                          <CalendarIcon className="h-8 w-8 text-slate-400" />
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2">
+                        <Badge 
+                          variant={event.eventStatus === 'pending' ? "secondary" : "default"}
+                          className={event.eventStatus === 'pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200' : 'bg-green-100 text-green-800 hover:bg-green-100 border-green-200'}
+                        >
+                          {event.eventStatus === 'pending' ? 'Pending Validation' : 'Approved'}
+                        </Badge>
+                      </div>
+                    </div>
                     <CardHeader className="p-4">
-                      <CardTitle className="text-base">
+                      <CardTitle className="text-base line-clamp-1">
                         {event.name}
                       </CardTitle>
-                      <CardDescription>
+                      <CardDescription className="line-clamp-1">
                         {format(new Date(event.startTime), "MMM dd")}
                         {event.address ? ` • ${event.address}` : event.venue ? ` • ${event.venue}` : ""}
                       </CardDescription>
+                      {event.eventStatus === 'pending' && (
+                         <div className="pt-2 flex gap-2">
+                            <Button size="sm" variant="outline" className="flex-1 border-green-200 hover:bg-green-50 text-green-700">Approve</Button>
+                            <Button size="sm" variant="outline" className="flex-1 border-red-200 hover:bg-red-50 text-red-700">Decline</Button>
+                         </div>
+                      )}
                     </CardHeader>
                   </Card>
                 ))
@@ -638,21 +697,76 @@ export default function ContentEngagementPage() {
                   }
 
                   for (let day = 1; day <= daysInMonth; day++) {
-                    const dayEvents = events.filter((e) => {
+                    const currentDayDate = new Date(year, month, day);
+                    const dayEvents = filteredEvents.filter((e) => {
                       const d = new Date(e.startTime);
                       return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
                     });
                     cells.push(
-                      <div key={day} className="bg-background min-h-[80px] p-2 border-t">
-                        <span className="text-xs">{day}</span>
+                      <div 
+                        key={day} 
+                        className="bg-background min-h-[80px] p-2 border-t hover:bg-muted/10 cursor-pointer transition-colors relative"
+                        onClick={() => {
+                          setEventForm(prev => ({ ...prev, date: currentDayDate }));
+                          setEventDialogOpen(true);
+                        }}
+                      >
+                        <span className="text-xs text-muted-foreground">{day}</span>
                         {dayEvents.map((e) => (
-                          <div
-                            key={e.eventId}
-                            className="mt-1 p-1 bg-blue-100 text-blue-700 text-[10px] rounded truncate"
-                            title={e.name}
-                          >
-                            {e.name}
-                          </div>
+                          <Popover key={e.eventId}>
+                            <PopoverTrigger asChild>
+                              <div
+                                onClick={(ev) => ev.stopPropagation()}
+                                className={`mt-1 p-1 text-[10px] rounded truncate cursor-pointer hover:opacity-80 transition-opacity ${
+                                  e.eventStatus === 'pending'
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}
+                                title={e.name}
+                              >
+                                {e.eventStatus === 'pending' ? '⏳ ' : ''}{e.name}
+                              </div>
+                            </PopoverTrigger>
+                            <PopoverContent 
+                              align="start" 
+                              className="w-[300px] p-0 overflow-hidden" 
+                              onClick={(ev) => ev.stopPropagation()}
+                            >
+                              {e.coverImageUrl ? (
+                                <img src={e.coverImageUrl} className="w-full h-32 object-cover" alt="cover" />
+                              ) : (
+                                <div className="w-full h-24 bg-slate-100 flex items-center justify-center">
+                                  <CalendarIcon className="h-8 w-8 text-slate-300" />
+                                </div>
+                              )}
+                              <div className="p-4 space-y-3">
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <Badge variant={e.eventStatus === 'pending' ? "secondary" : "default"} className={e.eventStatus === 'pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100' : ''}>
+                                      {e.eventStatus === 'pending' ? 'Pending' : 'Approved'}
+                                    </Badge>
+                                    <span className="text-[10px] text-muted-foreground uppercase">{format(new Date(e.startTime), 'h:mm a')}</span>
+                                  </div>
+                                  <h4 className="font-bold leading-tight mt-2">{e.name}</h4>
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{e.description || "No description provided."}</p>
+                                </div>
+                                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                  {e.type === 'online' ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                                  {e.address || e.venue || (e.type === 'online' ? "Online Event" : "No location set")}
+                                </div>
+                                <div className="pt-3 flex gap-2 border-t mt-3">
+                                  {e.eventStatus === 'pending' ? (
+                                    <>
+                                      <Button size="sm" variant="outline" className="flex-1 border-green-200 hover:bg-green-50 text-green-700">Approve</Button>
+                                      <Button size="sm" variant="outline" className="flex-1 border-red-200 hover:bg-red-50 text-red-700">Decline</Button>
+                                    </>
+                                  ) : (
+                                    <Button size="sm" variant="outline" className="w-full">Edit Event</Button>
+                                  )}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         ))}
                       </div>
                     );

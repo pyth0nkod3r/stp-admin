@@ -5,11 +5,12 @@ import {
   UserPlus,
   GraduationCap,
   ShieldCheck,
-  Mail,
+  Clock,
   Trash2,
   ExternalLink,
   Filter,
-  Loader2
+  Loader2,
+  FileDown
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useUsers, useAllUsers } from "@/hooks/useUsers";
 import { createUser } from "@/services/apiUsers";
@@ -50,6 +52,7 @@ import type { User } from "@/lib/type";
 
 export default function UserDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
   const perPage = 10;
 
@@ -62,15 +65,23 @@ export default function UserDirectoryPage() {
   const users = usersResponse?.data ?? [];
 
   // Fetch all users for stat counts (independent of pagination)
-  const { data: allUsersResponse } = useAllUsers();
+  const { data: allUsersResponse, isLoading: allUsersLoading } = useAllUsers();
   const allUsers = allUsersResponse?.data ?? [];
   const totalCount = allUsers.length;
   const verifiedCount = allUsers.filter((u: User) => u.isVerified).length;
   const pendingCount = allUsers.filter((u: User) => !u.isVerified).length;
 
-  // Real-time Search Functionality
+  // Real-time Search and Filter Functionality
   const filteredUsers = useMemo(() => {
-    return users.filter((person) => {
+    let result = users;
+
+    if (statusFilter === "VERIFIED") {
+      result = result.filter(p => p.isVerified);
+    } else if (statusFilter === "PENDING") {
+      result = result.filter(p => !p.isVerified);
+    }
+
+    return result.filter((person) => {
       const searchable = [
         person.firstName,
         person.lastName,
@@ -81,7 +92,36 @@ export default function UserDirectoryPage() {
         val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
-  }, [searchTerm, users]);
+  }, [searchTerm, users, statusFilter]);
+
+  const handleExportCSV = () => {
+    const exportData = allUsers.map(u => ({
+      "First Name": u.firstName,
+      "Last Name": u.lastName,
+      "Email Address": u.email,
+      "Status": u.isVerified ? "Verified Alumni" : "Pending",
+      "Role": u.role || "USER",
+    }));
+
+    if (exportData.length === 0) {
+      toast.error("No data to export");
+      return;
+    }
+
+    const headers = Object.keys(exportData[0]).join(",");
+    const rows = exportData.map(obj => Object.values(obj).map(val => `"${val}"`).join(","));
+    const csvContent = [headers, ...rows].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `alumni_directory_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("CSV exported successfully");
+  };
 
   // TODO: Implement delete via API endpoint
   const handleDelete = (userId: string) => {
@@ -119,7 +159,7 @@ export default function UserDirectoryPage() {
   };
 
   const getStatus = (user: User) => {
-    if (user.isVerified) return "Verified";
+    if (user.isVerified) return "Verified Alumni";
     // TODO: Map additional statuses (e.g., isLocked → "Flagged")
     return "Pending";
   };
@@ -190,9 +230,9 @@ export default function UserDirectoryPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Alumni" value={totalCount} icon={<GraduationCap />} sub="Live count" />
-        <StatCard title="Verified" value={verifiedCount} icon={<ShieldCheck />} sub="Active members" />
-        <StatCard title="Pending" value={pendingCount} icon={<Mail />} sub="Requires action" color="text-orange-500" />
+        <StatCard title="Total Alumni" value={totalCount} icon={<GraduationCap />} sub="Total registered alumni" loading={allUsersLoading} />
+        <StatCard title="Verified Alumni" value={verifiedCount} icon={<ShieldCheck />} sub="Officially verified alumni" loading={allUsersLoading} />
+        <StatCard title="Pending Review" value={pendingCount} icon={<Clock />} sub="Awaiting admin approval" color="text-orange-500" loading={allUsersLoading} />
       </div>
 
       <Card className="overflow-hidden">
@@ -208,10 +248,23 @@ export default function UserDirectoryPage() {
               />
             </div>
             <div className="flex items-center gap-2">
-               <Button variant="outline" size="sm" className="hidden sm:flex">
-                 <Filter className="mr-2 h-4 w-4" /> Filter
+               <DropdownMenu>
+                 <DropdownMenuTrigger asChild>
+                   <Button variant="outline" size="sm" className="hidden sm:flex">
+                     <Filter className="mr-2 h-4 w-4" /> 
+                     {statusFilter === "ALL" ? "Filter" : statusFilter === "VERIFIED" ? "Verified" : "Pending"}
+                   </Button>
+                 </DropdownMenuTrigger>
+                 <DropdownMenuContent align="end">
+                   <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusFilter("ALL")}>All Alumni</DropdownMenuItem>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusFilter("VERIFIED")}>Verified Alumni</DropdownMenuItem>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusFilter("PENDING")}>Pending Approval</DropdownMenuItem>
+                 </DropdownMenuContent>
+               </DropdownMenu>
+               <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                 <FileDown className="mr-2 h-4 w-4" /> Export CSV
                </Button>
-               <Button variant="outline" size="sm">Export CSV</Button>
             </div>
           </div>
         </CardHeader>
@@ -271,7 +324,7 @@ export default function UserDirectoryPage() {
                       <TableCell className="hidden lg:table-cell text-muted-foreground">—</TableCell>
                       <TableCell>
                         <Badge variant={
-                          getStatus(person) === "Verified" ? "default" :
+                          getStatus(person) === "Verified Alumni" ? "default" :
                           getStatus(person) === "Pending" ? "secondary" : "destructive"
                         } className="text-[10px] sm:text-xs">
                           {getStatus(person)}
@@ -363,7 +416,7 @@ export default function UserDirectoryPage() {
 }
 
 // Reusable Stat Card Component
-function StatCard({ title, value, icon, sub, color = "text-muted-foreground" }: any) {
+function StatCard({ title, value, icon, sub, color = "text-muted-foreground", loading = false }: any) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -371,7 +424,11 @@ function StatCard({ title, value, icon, sub, color = "text-muted-foreground" }: 
         <div className={color}>{React.cloneElement(icon, { size: 16 })}</div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        {loading ? (
+          <Skeleton className="h-8 w-16 mb-1" />
+        ) : (
+          <div className="text-2xl font-bold">{value !== null && value !== undefined ? value : 0}</div>
+        )}
         <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">{sub}</p>
       </CardContent>
     </Card>

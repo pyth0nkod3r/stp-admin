@@ -1,13 +1,14 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { 
   Users, 
-  Car, 
+  Briefcase, 
   ShieldAlert, 
   MousePointer2, 
   TrendingUp, 
-  ArrowUpRight 
+  ArrowUpRight,
+  CalendarDays
 } from "lucide-react";
-     import { MessageSquare, Zap, FileDown, PlusCircle } from "lucide-react";
+import { MessageSquare, Zap, FileDown, PlusCircle } from "lucide-react";
 
 import { 
   Card, 
@@ -29,12 +30,10 @@ import {
   Cell,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-<<<<<<< HEAD
 import { fetchDashboardSummary, type DashboardSummary } from "@/services/apiDashboard";
 import { fetchUsers } from "@/services/apiUsers";
 import type { User } from "@/lib/type";
-=======
->>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Mock Data for Charts
 const engagementData = [
@@ -48,7 +47,6 @@ const engagementData = [
 ];
 
 export default function AdminOverview() {
-<<<<<<< HEAD
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
@@ -70,12 +68,10 @@ export default function AdminOverview() {
   const pendingCount = users.filter((u) => !u.isVerified).length;
 
   const userDistribution = [
-    { name: "Verified", value: verifiedCount, color: "#0f172a" },
+    { name: "Verified Alumni", value: verifiedCount, color: "#0f172a" },
     { name: "Pending", value: pendingCount, color: "#f97316" },
   ];
 
-=======
->>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
@@ -85,39 +81,34 @@ export default function AdminOverview() {
       {/* Top Level Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard 
-          title="Total Users" 
-          value="1,170" 
-          description="Verified vs Guests" 
+          title="Total Alumni" 
+          value={summary?.totalUsers} 
+          description="Total registered alumni" 
           icon={<Users className="h-4 w-4 text-muted-foreground" />} 
+          loading={loading}
         />
         <MetricCard 
-          title="Active Deal Rooms" 
-          value="12" 
-          description="4 closing soon" 
-          icon={<Car className="h-4 w-4 text-muted-foreground" />} 
+          title="Active Alumni" 
+          value={summary?.activeUsers} 
+          description="Currently active alumni" 
+          icon={<Zap className="h-4 w-4 text-muted-foreground" />} 
+          loading={loading}
         />
-<<<<<<< HEAD
         <MetricCard
-          title="Pending Verifications"
-          value={usersLoading ? null : pendingCount}
-          description="Needs your attention"
-          icon={<ShieldAlert className="h-4 w-4 text-orange-500" />}
-          highlight
-          loading={usersLoading}
-=======
-        <MetricCard 
-          title="Pending Verifications" 
-          value="28" 
-          description="Needs your attention" 
-          icon={<ShieldAlert className="h-4 w-4 text-orange-500" />} 
-          highlight
->>>>>>> parent of 0d0e7b3 (Merge branch 'main' of github.com:pyth0nkod3r/stp-admin-1)
+          title="Active Groups"
+          value={summary?.totalGroups}
+          description={`${summary?.pendingGroups || 0} pending approval`}
+          icon={<Users className="h-4 w-4 text-muted-foreground" />}
+          loading={loading}
+          highlight={summary?.pendingGroups ? summary.pendingGroups > 0 : false}
         />
         <MetricCard 
-          title="Marketplace Clicks" 
-          value="456" 
-          description="+18% from last week" 
-          icon={<MousePointer2 className="h-4 w-4 text-muted-foreground" />} 
+          title="Active Events" 
+          value={summary?.totalEvents} 
+          description={`${summary?.pendingEvents || 0} pending approval`} 
+          icon={<CalendarDays className="h-4 w-4 text-muted-foreground" />} 
+          loading={loading}
+          highlight={summary?.pendingEvents ? summary.pendingEvents > 0 : false}
         />
       </div>
 
@@ -125,7 +116,7 @@ export default function AdminOverview() {
         {/* Engagement Chart */}
         <Card className="col-span-4">
           <CardHeader>
-            <CardTitle>Marketplace Engagement</CardTitle>
+            <CardTitle>Alumni Connections</CardTitle>
             <CardDescription>Total "Connect" and "Chat" clicks initiated</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
@@ -146,10 +137,10 @@ export default function AdminOverview() {
           </CardContent>
         </Card>
 
-        {/* User Distribution */}
+        {/* Alumni Distribution */}
         <Card className="col-span-3">
           <CardHeader>
-            <CardTitle>User Distribution</CardTitle>
+            <CardTitle>Alumni Distribution</CardTitle>
             <CardDescription>Verified vs. Pending Verification</CardDescription>
           </CardHeader>
           <CardContent>
@@ -206,9 +197,9 @@ export default function AdminOverview() {
     <CardContent>
       <div className="space-y-6">
         {[
-          { icon: <PlusCircle className="text-blue-500" />, text: "New Deal Room created", sub: "Tech Startup Seed Funding", time: "12m ago" },
+          { icon: <PlusCircle className="text-blue-500" />, text: "New Opportunity Posted", sub: "Tech Startup Seed Funding", time: "12m ago" },
           { icon: <Zap className="text-yellow-500" />, text: "New Alumni joined", sub: "Dr. Sarah Jenkins (Class of '18)", time: "45m ago" },
-          { icon: <MessageSquare className="text-green-500" />, text: "Marketplace Inquiry", sub: "Interest in 'UI Design Service'", time: "2h ago" },
+          { icon: <MessageSquare className="text-green-500" />, text: "Connection Request", sub: "Interest in 'UI Design Service'", time: "2h ago" },
           { icon: <FileDown className="text-muted-foreground" />, text: "Resource Downloaded", sub: "Investment_Template.pdf", time: "3h ago" },
         ].map((item, i) => (
           <div key={i} className="flex items-start gap-4">
@@ -277,7 +268,7 @@ export default function AdminOverview() {
   );
 }
 
-function MetricCard({ title, value, description, icon, highlight = false }: any) {
+function MetricCard({ title, value, description, icon, highlight = false, loading = false }: any) {
   return (
     <Card className={highlight ? "border-orange-200 bg-orange-50/30" : ""}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -285,7 +276,11 @@ function MetricCard({ title, value, description, icon, highlight = false }: any)
         {icon}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        {loading ? (
+          <Skeleton className="h-8 w-16 mb-1" />
+        ) : (
+          <div className="text-2xl font-bold">{value !== null && value !== undefined ? value : 0}</div>
+        )}
         <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </CardContent>
     </Card>

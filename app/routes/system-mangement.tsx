@@ -66,14 +66,14 @@ export default function SystemManagementPage() {
               onExport={() => exportData("Registry")}
             />
             <ExportCard 
-              title="Marketplace Activity" 
+              title="Networking Activity" 
               desc="Log of 'Connect' clicks and service inquiries."
-              onExport={() => exportData("Marketplace")}
+              onExport={() => exportData("Networking")}
             />
             <ExportCard 
               title="Opportunity Logs" 
-              desc="Record of Deal Room requests and document access."
-              onExport={() => exportData("Deal Rooms")}
+              desc="Record of Opportunity requests and document access."
+              onExport={() => exportData("Opportunities")}
             />
           </div>
         </TabsContent>
@@ -93,7 +93,7 @@ export default function SystemManagementPage() {
               />
               <RuleToggle 
                 label="Opportunity Moderation" 
-                desc="Require admin approval before a new 'Deal Room' goes live." 
+                desc="Require admin approval before a new 'Opportunity' goes live." 
                 defaultChecked 
               />
               <RuleToggle 

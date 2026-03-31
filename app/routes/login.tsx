@@ -17,8 +17,8 @@ import type { Route } from "../+types/root";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Stp Alumni - Admin Login" },
-    { name: "description", content: "Stp Alumnni admin login page" },
+    { title: "STP Alumni - Admin Login" },
+    { name: "description", content: "STP Alumni admin login page" },
   ];
 }
 
@@ -67,10 +67,10 @@ const Login = () => {
           </div>
           <div>
             <CardTitle className="text-2xl font-bold tracking-tight">
-              Stp Admin
+              STP Alumni Network
             </CardTitle>
             <CardDescription className="text-muted-foreground mt-1">
-              Sign in to access the dashboard
+              Sign in to access the admin dashboard
             </CardDescription>
           </div>
         </CardHeader>

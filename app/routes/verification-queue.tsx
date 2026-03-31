@@ -6,7 +6,8 @@ import {
   FileText, 
   Search, 
   AlertCircle,
-  Clock
+  Clock,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,31 +32,29 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-
-const PENDING_DATA = [
-  { id: 1, name: "Marcus Wright", email: "m.wright@gmail.com", class: "2023", major: "Mechanical Engineering", docType: "Degree Scan", submittedAt: "2 hours ago" },
-  { id: 2, name: "Sarah Chen", email: "schen99@outlook.com", class: "2019", major: "Biochemistry", docType: "Transcript", submittedAt: "5 hours ago" },
-  { id: 3, name: "Julian Rossi", email: "j.rossi@alumni.it", class: "2021", major: "Architecture", docType: "ID Card", submittedAt: "1 day ago" },
-  { id: 4, name: "Elena Gilbert", email: "elena.g@gmail.com", class: "2020", major: "History", docType: "Degree Scan", submittedAt: "2 days ago" },
-];
+import { useAllUsers } from "@/hooks/useUsers";
+import type { User } from "@/lib/type";
 
 export default function VerificationQueuePage() {
-  const [queue, setQueue] = useState(PENDING_DATA);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const handleAction = (id: number, action: "approve" | "reject") => {
-    setQueue(queue.filter(item => item.id !== id));
+  const { data: allUsersResponse, isLoading, error } = useAllUsers();
+  const allUsers = allUsersResponse?.data ?? [];
+  const queue = allUsers.filter((u: User) => !u.isVerified);
+
+  const handleAction = (id: string, action: "approve" | "reject") => {
     if (action === "approve") {
-      toast.success("Alumni approved and notified.");
+      toast.success("Verify not yet connected to API");
     } else {
-      toast.error("Application rejected.");
+      toast.error("Reject not yet connected to API");
     }
   };
 
-  const filteredQueue = queue.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.major.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredQueue = queue.filter((user: User) => {
+    const name = `${user.firstName} ${user.lastName}`.toLowerCase();
+    const email = user.email?.toLowerCase() || "";
+    return name.includes(searchTerm.toLowerCase()) || email.includes(searchTerm.toLowerCase());
+  });
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -94,34 +93,51 @@ export default function VerificationQueuePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredQueue.length > 0 ? (
-                filteredQueue.map((user) => (
-                  <TableRow key={user.id}>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading queue...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                    Failed to load queue. Please try again.
+                  </TableCell>
+                </TableRow>
+              ) : filteredQueue.length > 0 ? (
+                filteredQueue.map((user: User) => {
+                  const fullName = `${user.firstName} ${user.lastName}`;
+                  return (
+                  <TableRow key={user.userId}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
-                          <AvatarFallback>{user.name[0]}</AvatarFallback>
+                          <AvatarFallback>{`${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`}</AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col min-w-0">
-                          <span className="font-medium text-sm truncate">{user.name}</span>
+                          <span className="font-medium text-sm truncate">{fullName}</span>
                           <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm">
-                      <div>Class of {user.class}</div>
-                      <div className="text-xs text-muted-foreground">{user.major}</div>
+                      <div className="text-muted-foreground">—</div>
+                      <div className="text-xs text-muted-foreground">—</div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 text-xs font-medium text-blue-600">
                         <FileText className="h-3.5 w-3.5" />
-                        {user.docType}
+                        Account Verification
                       </div>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        {user.submittedAt}
+                        {(user as any).createdAt ? new Date((user as any).createdAt).toLocaleDateString() : "—"}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -137,20 +153,20 @@ export default function VerificationQueuePage() {
                             <DialogHeader>
                               <DialogTitle>Review Credentials</DialogTitle>
                               <DialogDescription>
-                                Verifying {user.name} - Class of {user.class}
+                                Verifying {fullName}
                               </DialogDescription>
                             </DialogHeader>
                             
                             <div className="aspect-video w-full bg-muted rounded-md flex flex-col items-center justify-center border-2 border-dashed">
                               <FileText className="h-12 w-12 text-muted-foreground mb-2" />
-                              <p className="text-sm text-muted-foreground">Document Preview: {user.docType}.pdf</p>
-                              <Button variant="link" size="sm">Download Original</Button>
+                              <p className="text-sm text-muted-foreground">Document Preview: Not available</p>
+                              <Button variant="link" size="sm" disabled>Download Original</Button>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 py-4">
                               <div className="space-y-1">
                                 <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Major</p>
-                                <p className="text-sm font-medium">{user.major}</p>
+                                <p className="text-sm font-medium">—</p>
                               </div>
                               <div className="space-y-1">
                                 <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Status</p>
@@ -159,10 +175,10 @@ export default function VerificationQueuePage() {
                             </div>
 
                             <DialogFooter className="gap-2 sm:justify-between">
-                              <Button variant="ghost" onClick={() => handleAction(user.id, "reject")}>
+                              <Button variant="ghost" onClick={() => handleAction(user.userId, "reject")}>
                                 <XCircle className="mr-2 h-4 w-4 text-destructive" /> Reject Applicant
                               </Button>
-                              <Button onClick={() => handleAction(user.id, "approve")}>
+                              <Button onClick={() => handleAction(user.userId, "approve")}>
                                 <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" /> Approve Alumni
                               </Button>
                             </DialogFooter>
@@ -171,7 +187,7 @@ export default function VerificationQueuePage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                )})
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center">
