@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./config";
+import { clearAuthAndRedirect } from "./authUtils";
 
 export interface DashboardSummary {
   totalUsers: number;
@@ -28,6 +29,10 @@ export async function fetchDashboardSummary(): Promise<DashboardResponse> {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
     const err = await response.json().catch(() => null);
     throw new Error(err?.message || "Failed to fetch dashboard summary");
   }

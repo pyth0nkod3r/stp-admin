@@ -33,18 +33,32 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAllUsers } from "@/hooks/useUsers";
+import { verifyUser } from "@/services/apiUsers";
+import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@/lib/type";
 
 export default function VerificationQueuePage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: allUsersResponse, isLoading, error } = useAllUsers();
   const allUsers = allUsersResponse?.data ?? [];
   const queue = allUsers.filter((u: User) => !u.isVerified);
 
-  const handleAction = (id: string, action: "approve" | "reject") => {
+  const handleAction = async (id: string, action: "approve" | "reject") => {
     if (action === "approve") {
-      toast.success("Verify not yet connected to API");
+      setVerifyingId(id);
+      try {
+        await verifyUser(id);
+        toast.success("User verified successfully");
+        queryClient.invalidateQueries({ queryKey: ["users-all"] });
+        queryClient.invalidateQueries({ queryKey: ["users"] });
+      } catch (err: any) {
+        toast.error(err.message || "Failed to verify user");
+      } finally {
+        setVerifyingId(null);
+      }
     } else {
       toast.error("Reject not yet connected to API");
     }
@@ -178,8 +192,14 @@ export default function VerificationQueuePage() {
                               <Button variant="ghost" onClick={() => handleAction(user.userId, "reject")}>
                                 <XCircle className="mr-2 h-4 w-4 text-destructive" /> Reject Applicant
                               </Button>
-                              <Button onClick={() => handleAction(user.userId, "approve")}>
-                                <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" /> Approve Alumni
+                              <Button
+                                onClick={() => handleAction(user.userId, "approve")}
+                                disabled={verifyingId === user.userId}
+                              >
+                                {verifyingId === user.userId
+                                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  : <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />}
+                                Approve Alumni
                               </Button>
                             </DialogFooter>
                           </DialogContent>

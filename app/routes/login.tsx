@@ -23,7 +23,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 const Login = () => {
-  const token = localStorage.getItem("stp_token");
+  const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
   if (token) return <Navigate to="/admin/dashboard" replace />;
 
   const navigate = useNavigate();

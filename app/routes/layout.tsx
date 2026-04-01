@@ -7,7 +7,7 @@ import { ClimbingBoxLoader } from "react-spinners";
 import Loading from "@/components/Loader";
 
 export default function Layout() {
-  const token = localStorage.getItem("stp_token");
+  const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
 
   if (!token) {
     return <Navigate to="/login" replace />;

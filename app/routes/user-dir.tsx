@@ -46,7 +46,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useUsers, useAllUsers } from "@/hooks/useUsers";
-import { createUser } from "@/services/apiUsers";
+import { createUser, verifyUser } from "@/services/apiUsers";
 import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@/lib/type";
 
@@ -55,6 +55,16 @@ export default function UserDirectoryPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
   const perPage = 10;
+
+  const handleStatusFilter = (filter: string) => {
+    setStatusFilter(filter);
+    setPage(1);
+  };
+
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    setPage(1);
+  };
 
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ firstName: "", lastName: "", emailAddress: "" });
@@ -71,9 +81,14 @@ export default function UserDirectoryPage() {
   const verifiedCount = allUsers.filter((u: User) => u.isVerified).length;
   const pendingCount = allUsers.filter((u: User) => !u.isVerified).length;
 
-  // Real-time Search and Filter Functionality
+  // When filtering/searching, apply across all users (not just the current page)
+  const isFiltering = statusFilter !== "ALL" || searchTerm !== "";
+
   const filteredUsers = useMemo(() => {
-    let result = users;
+    // Use allUsers as source when filtering so results aren't limited to current page
+    const source = isFiltering ? allUsers : users;
+
+    let result = source;
 
     if (statusFilter === "VERIFIED") {
       result = result.filter(p => p.isVerified);
@@ -92,7 +107,14 @@ export default function UserDirectoryPage() {
         val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
-  }, [searchTerm, users, statusFilter]);
+  }, [searchTerm, users, allUsers, statusFilter, isFiltering]);
+
+  // When filtering client-side, paginate the filtered results manually
+  const displayedUsers = isFiltering
+    ? filteredUsers.slice((page - 1) * perPage, page * perPage)
+    : filteredUsers;
+  const totalFilteredPages = isFiltering ? Math.ceil(filteredUsers.length / perPage) : null;
+  const showNextPage = isFiltering ? page < (totalFilteredPages ?? 1) : hasNextPage;
 
   const handleExportCSV = () => {
     const exportData = allUsers.map(u => ({
@@ -128,9 +150,15 @@ export default function UserDirectoryPage() {
     toast.error("Delete not yet connected to API");
   };
 
-  // TODO: Implement verify via API endpoint
-  const handleVerify = (userId: string) => {
-    toast.success("Verify not yet connected to API");
+  const handleVerify = async (userId: string) => {
+    try {
+      await verifyUser(userId);
+      toast.success("User verified successfully");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to verify user");
+    }
   };
 
   const handleAddAlumni = async (e: React.FormEvent) => {
@@ -244,7 +272,7 @@ export default function UserDirectoryPage() {
                 placeholder="Search alumni..."
                 className="pl-9"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -257,9 +285,9 @@ export default function UserDirectoryPage() {
                  </DropdownMenuTrigger>
                  <DropdownMenuContent align="end">
                    <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
-                   <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusFilter("ALL")}>All Alumni</DropdownMenuItem>
-                   <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusFilter("VERIFIED")}>Verified Alumni</DropdownMenuItem>
-                   <DropdownMenuItem className="cursor-pointer" onClick={() => setStatusFilter("PENDING")}>Pending Approval</DropdownMenuItem>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => handleStatusFilter("ALL")}>All Alumni</DropdownMenuItem>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => handleStatusFilter("VERIFIED")}>Verified Alumni</DropdownMenuItem>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => handleStatusFilter("PENDING")}>Pending Approval</DropdownMenuItem>
                  </DropdownMenuContent>
                </DropdownMenu>
                <Button variant="outline" size="sm" onClick={handleExportCSV}>
@@ -298,8 +326,8 @@ export default function UserDirectoryPage() {
                       Failed to load users. Please try again.
                     </TableCell>
                   </TableRow>
-                ) : filteredUsers.length > 0 ? (
-                  filteredUsers.map((person) => (
+                ) : displayedUsers.length > 0 ? (
+                  displayedUsers.map((person) => (
                     <TableRow key={person.userId} className="hover:bg-muted/30 transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -374,7 +402,7 @@ export default function UserDirectoryPage() {
           </div>
 
           {/* Pagination - only show when there are multiple pages */}
-          {!isLoading && !error && (page > 1 || hasNextPage) && (
+          {!isLoading && !error && (page > 1 || showNextPage) && (
             <div className="flex items-center justify-end gap-2 py-4 px-2">
               {page > 1 && (
                 <Button
@@ -386,7 +414,7 @@ export default function UserDirectoryPage() {
                 </Button>
               )}
               <span className="text-sm text-muted-foreground">Page {page}</span>
-              {hasNextPage && (
+              {showNextPage && (
                 <Button
                   variant="outline"
                   size="sm"

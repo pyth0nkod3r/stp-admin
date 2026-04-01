@@ -1,5 +1,6 @@
 import type { Event } from "@/lib/type";
 import { API_BASE_URL } from "./config";
+import { clearAuthAndRedirect } from "./authUtils";
 
 export interface EventsResponse {
   status: boolean;
@@ -30,6 +31,10 @@ export async function fetchPendingEvents(): Promise<EventsResponse> {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
     const err = await response.json().catch(() => null);
     throw new Error(err?.message || "Failed to fetch pending events");
   }
@@ -79,6 +84,10 @@ export async function fetchEventById(
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
     const err = await response.json().catch(() => null);
     throw new Error(err?.message || "Failed to fetch event details");
   }
@@ -119,6 +128,10 @@ export async function createEvent(
   const result = await response.json();
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
     throw new Error(result?.message || "Failed to create event");
   }
 
