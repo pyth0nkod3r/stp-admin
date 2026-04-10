@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { 
   Users, 
   Briefcase, 
@@ -30,8 +30,8 @@ import {
   Cell,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { fetchDashboardSummary, type DashboardSummary } from "@/services/apiDashboard";
-import { fetchUsers } from "@/services/apiUsers";
+import { useDashboard } from "@/hooks/useDashboard";
+import { useUsers } from "@/hooks/useUsers";
 import type { User } from "@/lib/type";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -47,22 +47,20 @@ const engagementData = [
 ];
 
 export default function AdminOverview() {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<User[]>([]);
-  const [usersLoading, setUsersLoading] = useState(true);
+  const { data: dashboardData, isLoading: loading, error: dashboardError } = useDashboard();
+  const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers(1, 100);
+  
+  const summary = dashboardData || null;
+  const users = usersResponse?.data || [];
 
   useEffect(() => {
-    fetchDashboardSummary()
-      .then((res) => setSummary(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-
-    fetchUsers(1, 100)
-      .then((res) => setUsers(res.data))
-      .catch(() => {})
-      .finally(() => setUsersLoading(false));
-  }, []);
+    if (dashboardError) {
+      console.error("Dashboard error:", dashboardError);
+    }
+    if (usersError) {
+      console.error("Users error:", usersError);
+    }
+  }, [dashboardError, usersError]);
 
   const verifiedCount = users.filter((u) => u.isVerified).length;
   const pendingCount = users.filter((u) => !u.isVerified).length;

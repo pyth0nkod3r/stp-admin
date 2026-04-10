@@ -33,14 +33,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAllUsers } from "@/hooks/useUsers";
-import { verifyUser } from "@/services/apiUsers";
-import { useQueryClient } from "@tanstack/react-query";
+import { useVerifyUserMutation } from "@/hooks/useUsersMutations";
 import type { User } from "@/lib/type";
 
 export default function VerificationQueuePage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [verifyingId, setVerifyingId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
+  const verifyUserMutation = useVerifyUserMutation();
 
   const { data: allUsersResponse, isLoading, error } = useAllUsers();
   const allUsers = allUsersResponse?.data ?? [];
@@ -48,16 +46,10 @@ export default function VerificationQueuePage() {
 
   const handleAction = async (id: string, action: "approve" | "reject") => {
     if (action === "approve") {
-      setVerifyingId(id);
       try {
-        await verifyUser(id);
-        toast.success("User verified successfully");
-        queryClient.invalidateQueries({ queryKey: ["users-all"] });
-        queryClient.invalidateQueries({ queryKey: ["users"] });
+        await verifyUserMutation.mutateAsync(id);
       } catch (err: any) {
-        toast.error(err.message || "Failed to verify user");
-      } finally {
-        setVerifyingId(null);
+        // Error is handled by mutation hook
       }
     } else {
       toast.error("Reject not yet connected to API");
@@ -194,9 +186,9 @@ export default function VerificationQueuePage() {
                               </Button>
                               <Button
                                 onClick={() => handleAction(user.userId, "approve")}
-                                disabled={verifyingId === user.userId}
+                                disabled={verifyUserMutation.isPending}
                               >
-                                {verifyingId === user.userId
+                                {verifyUserMutation.isPending
                                   ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                   : <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />}
                                 Approve Alumni

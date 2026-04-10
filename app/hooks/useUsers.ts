@@ -1,19 +1,50 @@
 import { fetchUsers } from "@/services/apiUsers";
-import { useQuery } from "@tanstack/react-query";
+import { useUsersStore } from "@/stores/usersStore";
+import { useEffect, useState } from "react";
 
 export function useUsers(page: number = 1, perPage: number = 10) {
-  // Request one extra item to determine if a next page exists
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["users", page, perPage],
-    queryFn: () => fetchUsers(page, perPage + 1),
-  });
+  const users = useUsersStore((state) => state.users);
+  const isLoading = useUsersStore((state) => state.isLoading);
+  const error = useUsersStore((state) => state.error);
+  const setUsers = useUsersStore((state) => state.setUsers);
+  const setIsLoading = useUsersStore((state) => state.setIsLoading);
+  const setError = useUsersStore((state) => state.setError);
+  
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  const allItems = data?.data ?? [];
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
+    setIsAuthenticated(!!token);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || hasInitialized) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetchUsers(page, perPage + 1);
+        setUsers(response.data);
+      } catch (error: any) {
+        setError(error?.message || "Failed to fetch users");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+    setHasInitialized(true);
+  }, [isAuthenticated, hasInitialized]);
+
+  const allItems = users ?? [];
   const hasNextPage = allItems.length > perPage;
-  const users = hasNextPage ? allItems.slice(0, perPage) : allItems;
+  const paginatedUsers = hasNextPage ? allItems.slice(0, perPage) : allItems;
 
   return {
-    data: data ? { ...data, data: users } : data,
+    data: { data: paginatedUsers },
     isLoading,
     error,
     hasNextPage,
@@ -21,9 +52,45 @@ export function useUsers(page: number = 1, perPage: number = 10) {
 }
 
 export function useAllUsers() {
-  return useQuery({
-    queryKey: ["users-all"],
-    queryFn: () => fetchUsers(1, 10000),
-    staleTime: 5 * 60 * 1000,
-  });
+  const allUsers = useUsersStore((state) => state.allUsers);
+  const allUsersLoading = useUsersStore((state) => state.allUsersLoading);
+  const error = useUsersStore((state) => state.error);
+  const setAllUsers = useUsersStore((state) => state.setAllUsers);
+  const setAllUsersLoading = useUsersStore((state) => state.setAllUsersLoading);
+  const setError = useUsersStore((state) => state.setError);
+  
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
+    setIsAuthenticated(!!token);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || hasInitialized) return;
+
+    const fetchData = async () => {
+      setAllUsersLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetchUsers(1, 10000);
+        setAllUsers(response.data);
+      } catch (error: any) {
+        setError(error?.message || "Failed to fetch users");
+      } finally {
+        setAllUsersLoading(false);
+      }
+    };
+
+    fetchData();
+    setHasInitialized(true);
+  }, [isAuthenticated, hasInitialized]);
+
+  return {
+    data: { data: allUsers },
+    isLoading: allUsersLoading,
+    error,
+  };
 }

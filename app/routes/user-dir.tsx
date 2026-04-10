@@ -58,8 +58,16 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useUsers, useAllUsers } from "@/hooks/useUsers";
-import { createUser, verifyUser, deleteUser, activateUser, deactivateUser, lockUser, unlockUser, changeUserRole } from "@/services/apiUsers";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  useCreateUserMutation,
+  useVerifyUserMutation,
+  useDeleteUserMutation,
+  useActivateUserMutation,
+  useDeactivateUserMutation,
+  useLockUserMutation,
+  useUnlockUserMutation,
+  useChangeUserRoleMutation,
+} from "@/hooks/useUsersMutations";
 import type { User } from "@/lib/type";
 
 const getInitials = (firstName: string, lastName: string) => {
@@ -84,17 +92,23 @@ export default function UserDirectoryPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ firstName: "", lastName: "", emailAddress: "" });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [roleChangeOpen, setRoleChangeOpen] = useState(false);
   const [userToChangeRole, setUserToChangeRole] = useState<User | null>(null);
   const [newRole, setNewRole] = useState("");
-  const [isChangingRole, setIsChangingRole] = useState(false);
-  const queryClient = useQueryClient();
+
+  // Mutations
+  const createUserMutation = useCreateUserMutation();
+  const verifyUserMutation = useVerifyUserMutation();
+  const deleteUserMutation = useDeleteUserMutation();
+  const activateUserMutation = useActivateUserMutation();
+  const deactivateUserMutation = useDeactivateUserMutation();
+  const lockUserMutation = useLockUserMutation();
+  const unlockUserMutation = useUnlockUserMutation();
+  const changeUserRoleMutation = useChangeUserRoleMutation();
 
   const { data: usersResponse, isLoading, error, hasNextPage } = useUsers(page, perPage);
   const users = usersResponse?.data ?? [];
@@ -178,29 +192,20 @@ export default function UserDirectoryPage() {
   const confirmDelete = async () => {
     if (!userToDelete) return;
 
-    setIsDeleting(true);
     try {
-      await deleteUser(userToDelete.userId);
-      toast.success("User deleted successfully");
+      await deleteUserMutation.mutateAsync(userToDelete.userId);
       setDeleteOpen(false);
       setUserToDelete(null);
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete user");
-    } finally {
-      setIsDeleting(false);
+      // Error is handled by mutation
     }
   };
 
   const handleVerify = async (userId: string) => {
     try {
-      await verifyUser(userId);
-      toast.success("User verified successfully");
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+      await verifyUserMutation.mutateAsync(userId);
     } catch (err: any) {
-      toast.error(err.message || "Failed to verify user");
+      // Error is handled by mutation
     }
   };
 
@@ -211,45 +216,33 @@ export default function UserDirectoryPage() {
 
   const handleActivateUser = async (userId: string) => {
     try {
-      await activateUser(userId);
-      toast.success("User activated successfully");
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+      await activateUserMutation.mutateAsync(userId);
     } catch (err: any) {
-      toast.error(err.message || "Failed to activate user");
+      // Error is handled by mutation
     }
   };
 
   const handleDeactivateUser = async (userId: string) => {
     try {
-      await deactivateUser(userId);
-      toast.success("User deactivated successfully");
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+      await deactivateUserMutation.mutateAsync(userId);
     } catch (err: any) {
-      toast.error(err.message || "Failed to deactivate user");
+      // Error is handled by mutation
     }
   };
 
   const handleLockUser = async (userId: string) => {
     try {
-      await lockUser(userId);
-      toast.success("User locked successfully");
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+      await lockUserMutation.mutateAsync(userId);
     } catch (err: any) {
-      toast.error(err.message || "Failed to lock user");
+      // Error is handled by mutation
     }
   };
 
   const handleUnlockUser = async (userId: string) => {
     try {
-      await unlockUser(userId);
-      toast.success("User unlocked successfully");
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+      await unlockUserMutation.mutateAsync(userId);
     } catch (err: any) {
-      toast.error(err.message || "Failed to unlock user");
+      // Error is handled by mutation
     }
   };
 
@@ -262,18 +255,15 @@ export default function UserDirectoryPage() {
   const confirmChangeRole = async () => {
     if (!userToChangeRole || !newRole) return;
 
-    setIsChangingRole(true);
     try {
-      await changeUserRole(userToChangeRole.userId, newRole);
-      toast.success("User role changed successfully");
+      await changeUserRoleMutation.mutateAsync({
+        userId: userToChangeRole.userId,
+        role: newRole,
+      });
       setRoleChangeOpen(false);
       setUserToChangeRole(null);
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
     } catch (err: any) {
-      toast.error(err.message || "Failed to change user role");
-    } finally {
-      setIsChangingRole(false);
+      // Error is handled by mutation
     }
   };
 
@@ -283,18 +273,12 @@ export default function UserDirectoryPage() {
       toast.error("All fields are required");
       return;
     }
-    setIsSubmitting(true);
     try {
-      await createUser(addForm);
-      toast.success("Alumni added successfully");
+      await createUserMutation.mutateAsync(addForm);
       setAddForm({ firstName: "", lastName: "", emailAddress: "" });
       setAddOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
     } catch (err: any) {
-      toast.error(err.message || "Failed to add alumni");
-    } finally {
-      setIsSubmitting(false);
+      // Error is handled by mutation hook
     }
   };
 
@@ -358,8 +342,8 @@ export default function UserDirectoryPage() {
                 <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button type="submit" disabled={createUserMutation.isPending}>
+                  {createUserMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Add Alumni
                 </Button>
               </DialogFooter>
@@ -602,7 +586,7 @@ export default function UserDirectoryPage() {
         newRole={newRole}
         onRoleChange={setNewRole}
         onConfirm={confirmChangeRole}
-        isLoading={isChangingRole}
+        isLoading={changeUserRoleMutation.isPending}
       />
 
       {/*

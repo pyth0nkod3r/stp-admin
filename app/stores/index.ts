@@ -3,6 +3,8 @@ export * from './authStore';
 export * from './uiStore';
 export * from './postsStore';
 export * from './usersStore';
+export * from './dashboardStore';
+export * from './eventsStore';
 export * from './opportunitiesStore';
 export * from './types';
 export * from './hooks';
