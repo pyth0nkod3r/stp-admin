@@ -65,11 +65,126 @@ import { format } from "date-fns";
 import { createEvent } from "@/services/apiEvents";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useEvents } from "@/hooks/useEvents";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
+import {
+  getPendingPosts,
+  approvePost,
+  rejectPost,
+  createNews,
+  updateNews,
+  deleteNews,
+  getNews,
+  approveEvent,
+  declineEvent,
+  getResources,
+  archiveResource,
+  deleteResource,
+  type FeedPost,
+  type NewsItem,
+  type CreateNewsPayload,
+  type UpdateNewsPayload,
+  type Resource,
+} from "@/services/apiUsers";
 
 export default function ContentEngagementPage() {
   const { events, isLoading: eventsLoading } = useEvents();
   const queryClient = useQueryClient();
+
+  // Fetch pending posts
+  const { data: pendingPosts = [], isLoading: postsLoading } = useQuery({
+    queryKey: ['pending-posts'],
+    queryFn: getPendingPosts,
+  });
+
+  // Fetch news
+  const { data: newsItems = [], isLoading: newsItemsLoading } = useQuery({
+    queryKey: ['news'],
+    queryFn: getNews,
+  });
+
+  // Fetch resources
+  const { data: resources = [], isLoading: resourcesLoading } = useQuery({
+    queryKey: ['resources'],
+    queryFn: getResources,
+  });
+
+  // Mutations for posts
+  const approvePostMutation = useMutation({
+    mutationFn: approvePost,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-posts'] });
+      toast.success('Post approved successfully');
+    },
+  });
+
+  const rejectPostMutation = useMutation({
+    mutationFn: rejectPost,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-posts'] });
+      toast.success('Post rejected');
+    },
+  });
+
+  // Mutations for events
+  const approveEventMutation = useMutation({
+    mutationFn: approveEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      toast.success('Event approved successfully');
+    },
+  });
+
+  const declineEventMutation = useMutation({
+    mutationFn: declineEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      toast.success('Event declined');
+    },
+  });
+
+  // Mutations for resources
+  const archiveResourceMutation = useMutation({
+    mutationFn: archiveResource,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+      toast.success('Resource archived');
+    },
+  });
+
+  const deleteResourceMutation = useMutation({
+    mutationFn: deleteResource,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+      toast.success('Resource deleted');
+    },
+  });
+
+  // Mutations for news
+  const updateNewsMutation = useMutation({
+    mutationFn: ({ postId, payload }: { postId: string; payload: UpdateNewsPayload }) =>
+      updateNews(postId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['news'] });
+      toast.success('News updated successfully!');
+      setEditNewsDialogOpen(false);
+      setEditingNewsId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to update news");
+    },
+  });
+
+  const deleteNewsMutation = useMutation({
+    mutationFn: deleteNews,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['news'] });
+      toast.success('News deleted successfully!');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to delete news");
+    },
+  });
+  
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
   const [eventStatusFilter, setEventStatusFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
@@ -89,6 +204,34 @@ export default function ContentEngagementPage() {
     rsvpLimit: "",
   });
   const coverImageRef = useRef<HTMLInputElement>(null);
+  const newsImagesRef = useRef<HTMLInputElement>(null);
+
+   // News form state
+   const [newsDialogOpen, setNewsDialogOpen] = useState(false);
+   const [newsForm, setNewsForm] = useState({
+     title: "",
+     category: "",
+     body: "",
+   });
+   const [newsImages, setNewsImages] = useState<File[]>([]);
+   const [newsLoading, setNewsLoading] = useState(false);
+
+   // Post detail modal
+   const [postDialogOpen, setPostDialogOpen] = useState(false);
+   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
+
+   // Edit news modal
+   const [editNewsDialogOpen, setEditNewsDialogOpen] = useState(false);
+   const [editNewsForm, setEditNewsForm] = useState({
+     title: "",
+     category: "",
+     body: "",
+   });
+   const [editNewsImages, setEditNewsImages] = useState<File[]>([]);
+   const [editingNewsId, setEditingNewsId] = useState<string | null>(null);
+
+   // Analytics dialog
+   const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false);
 
   function handleEventChange(field: string, value: string) {
     setEventForm((prev) => ({ ...prev, [field]: value }));
@@ -163,6 +306,64 @@ export default function ContentEngagementPage() {
     }
   }
 
+  // News handlers
+  async function handleCreateNews() {
+    if (!newsForm.title.trim()) {
+      toast.error("Please enter a headline.");
+      return;
+    }
+    if (!newsForm.category) {
+      toast.error("Please select a category.");
+      return;
+    }
+    if (!newsForm.body.trim()) {
+      toast.error("Please enter article content.");
+      return;
+    }
+
+    setNewsLoading(true);
+    try {
+      await createNews({
+        title: newsForm.title,
+        body: newsForm.body,
+        category: newsForm.category,
+        postImages: newsImages.length > 0 ? newsImages : undefined,
+      });
+      toast.success("News published successfully!");
+      queryClient.invalidateQueries({ queryKey: ["news"] });
+      setNewsDialogOpen(false);
+      setNewsForm({
+        title: "",
+        category: "",
+        body: "",
+      });
+      setNewsImages([]);
+      if (newsImagesRef.current) newsImagesRef.current.value = "";
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to create news");
+    } finally {
+      setNewsLoading(false);
+    }
+  }
+
+  // Event approval handlers
+  const handleApproveEvent = (eventId: string) => {
+    approveEventMutation.mutate(eventId);
+  };
+
+  const handleDeclineEvent = (eventId: string) => {
+    declineEventMutation.mutate(eventId);
+  };
+
+  // Resource handlers
+  const handleArchiveResource = (resourceId: string) => {
+    archiveResourceMutation.mutate(resourceId);
+  };
+
+  const handleDeleteResource = (resourceId: string) => {
+    deleteResourceMutation.mutate(resourceId);
+  };
+
   const filteredEvents = events.filter((e) => {
     if (eventStatusFilter !== "all" && e.eventStatus !== eventStatusFilter) return false;
     if (eventTypeFilter !== "all" && e.type !== eventTypeFilter) return false;
@@ -170,7 +371,8 @@ export default function ContentEngagementPage() {
   });
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+    <>
+      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">
@@ -181,8 +383,8 @@ export default function ContentEngagementPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          {/* BEEFED UP NEWS MODAL */}
-          <Dialog>
+          {/* NEWS MODAL */}
+          <Dialog open={newsDialogOpen} onOpenChange={setNewsDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Newspaper className="h-4 w-4 mr-2" /> Draft News
@@ -198,41 +400,72 @@ export default function ContentEngagementPage() {
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Headline</Label>
-                  <Input placeholder="e.g. New Research Grant Announced" />
+                  <Input
+                    placeholder="e.g. New Research Grant Announced"
+                    value={newsForm.title}
+                    onChange={(e) => setNewsForm(prev => ({ ...prev, title: e.target.value }))}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Category</Label>
-                    <Select>
+                    <Select
+                      value={newsForm.category}
+                      onValueChange={(value) => setNewsForm(prev => ({ ...prev, category: value }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="announcement">
+                        <SelectItem value="Announcement">
                           Announcement
                         </SelectItem>
-                        <SelectItem value="achievement">Achievement</SelectItem>
-                        <SelectItem value="press">Press Release</SelectItem>
+                        <SelectItem value="Industry Update">Industry Update</SelectItem>
+                        <SelectItem value="Spotlight">Spotlight</SelectItem>
+                        <SelectItem value="Event">Event</SelectItem>
+                        <SelectItem value="Opportunity">Opportunity</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Featured Image</Label>
-                    <Button variant="secondary" className="w-full text-xs h-9">
-                      <ImageIcon className="mr-2 h-4 w-4" /> Upload
-                    </Button>
+                    <Label>Post Images (up to 5)</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      ref={newsImagesRef}
+                      className="cursor-pointer text-xs h-9"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []).slice(0, 5);
+                        setNewsImages(files);
+                      }}
+                    />
+                    {newsImages.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {newsImages.length} file(s) selected
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Article Content</Label>
+                  <Label>Post Content</Label>
                   <Textarea
                     className="min-h-[150px]"
                     placeholder="Start writing the story..."
+                    value={newsForm.body}
+                    onChange={(e) => setNewsForm(prev => ({ ...prev, body: e.target.value }))}
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button className="w-full">Publish News Feed</Button>
+                <Button
+                  className="w-full"
+                  onClick={handleCreateNews}
+                  disabled={newsLoading}
+                >
+                  {newsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Publish News Feed
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -397,8 +630,118 @@ export default function ContentEngagementPage() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
-        </div>
+           </Dialog>
+         
+         {/* EDIT NEWS MODAL */}
+         <Dialog open={editNewsDialogOpen} onOpenChange={setEditNewsDialogOpen}>
+           <DialogTrigger asChild>
+             <div className="pointer-events-none" />
+           </DialogTrigger>
+           <DialogContent className="sm:max-w-[500px]">
+             <DialogHeader>
+               <DialogTitle>Edit News Article</DialogTitle>
+               <DialogDescription>
+                 Update the content of this official news article.
+               </DialogDescription>
+             </DialogHeader>
+             <div className="grid gap-4 py-4">
+               <div className="space-y-2">
+                 <Label>Headline</Label>
+                 <Input
+                   placeholder="e.g. New Research Grant Announced"
+                   value={editNewsForm.title}
+                   onChange={(e) => setEditNewsForm(prev => ({ ...prev, title: e.target.value }))}
+                 />
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                   <Label>Category</Label>
+                   <Select
+                     value={editNewsForm.category}
+                     onValueChange={(value) => setEditNewsForm(prev => ({ ...prev, category: value }))}
+                   >
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="Announcement">
+                         Announcement
+                       </SelectItem>
+                       <SelectItem value="Industry Update">Industry Update</SelectItem>
+                       <SelectItem value="Spotlight">Spotlight</SelectItem>
+                       <SelectItem value="Event">Event</SelectItem>
+                       <SelectItem value="Opportunity">Opportunity</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+                 <div className="space-y-2">
+                   <Label>Post Images (up to 5)</Label>
+                   <Input
+                     type="file"
+                     accept="image/*"
+                     multiple
+                     ref={newsImagesRef}
+                     className="cursor-pointer text-xs h-9"
+                     onChange={(e) => {
+                       const files = Array.from(e.target.files || []).slice(0, 5);
+                       setEditNewsImages(files);
+                     }}
+                   />
+                   {editNewsImages.length > 0 && (
+                     <p className="text-xs text-muted-foreground mt-1">
+                       {editNewsImages.length} file(s) selected
+                     </p>
+                   )}
+                 </div>
+               </div>
+               <div className="space-y-2">
+                 <Label>Post Content</Label>
+                 <Textarea
+                   className="min-h-[150px]"
+                   placeholder="Start writing the story..."
+                   value={editNewsForm.body}
+                   onChange={(e) => setEditNewsForm(prev => ({ ...prev, body: e.target.value }))}
+                 />
+               </div>
+             </div>
+             <DialogFooter>
+               <Button
+                 className="w-full"
+                 onClick={async () => {
+                   if (!editNewsForm.title.trim()) {
+                     toast.error("Please enter a headline.");
+                     return;
+                   }
+                   if (!editNewsForm.category) {
+                     toast.error("Please select a category.");
+                     return;
+                   }
+                   if (!editNewsForm.body.trim()) {
+                     toast.error("Please enter article content.");
+                     return;
+                   }
+
+                   if (editingNewsId) {
+                     updateNewsMutation.mutate({
+                       postId: editingNewsId,
+                       payload: {
+                         title: editNewsForm.title,
+                         category: editNewsForm.category,
+                         body: editNewsForm.body,
+                         postImages: editNewsImages.length > 0 ? editNewsImages : undefined,
+                       },
+                     });
+                   }
+                 }}
+                 disabled={updateNewsMutation.isPending}
+               >
+                 {updateNewsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                 Update News
+               </Button>
+             </DialogFooter>
+           </DialogContent>
+         </Dialog>
+       </div>
       </div>
 
       <Tabs defaultValue="feed" className="space-y-4">
@@ -420,120 +763,237 @@ export default function ContentEngagementPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  {
-                    user: "David K.",
-                    content:
-                      "Just landed a role at Google! Thanks to the STP network for the prep...",
-                    status: "Pending",
-                    time: "1h ago",
-                  },
-                  {
-                    user: "Linda M.",
-                    content:
-                      "Anyone interested in a weekend hackathon for Fintech? Looking for partners.",
-                    status: "Flagged",
-                    time: "3h ago",
-                  },
-                ].map((post, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start justify-between p-4 border rounded-lg bg-muted/30"
-                  >
-                    <div className="flex gap-4">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>{post.user[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm">
-                            {post.user}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground uppercase">
-                            {post.time}
-                          </span>
-                          {post.status === "Flagged" && (
-                            <Badge
-                              variant="destructive"
-                              className="h-4 text-[9px]"
-                            >
-                              Flagged
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-snug">
-                          {post.content}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive h-8 w-8"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-green-600 h-8 w-8"
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    </div>
+                {postsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                ) : pendingPosts.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No pending posts to review.
+                  </p>
+                ) : (
+                   pendingPosts.map((post) => (
+                     <div
+                       key={post.id}
+                       className="flex items-start justify-between p-4 border rounded-lg bg-muted/30"
+                       onClick={() => {
+                         setSelectedPost(post);
+                         setPostDialogOpen(true);
+                       }}
+                       style={{ cursor: 'pointer' }}
+                     >
+                   <div className="flex gap-4">
+                     <Avatar className="h-10 w-10">
+                       <AvatarFallback>{post.user[0]}</AvatarFallback>
+                     </Avatar>
+                     <div className="space-y-1">
+                       <div className="flex items-center gap-2">
+                         <span className="font-semibold text-sm">
+                           {post.user}
+                         </span>
+                         <span className="text-[10px] text-muted-foreground uppercase">
+                           {post.time}
+                         </span>
+                         {post.status === "flagged" && (
+                           <Badge
+                             variant="destructive"
+                             className="h-4 text-[9px]"
+                           >
+                             Flagged
+                           </Badge>
+                         )}
+                       </div>
+                       <p className="text-sm text-muted-foreground leading-snug">
+                         {post.content}
+                       </p>
+                     </div>
+                   </div>
+                   <div className="flex gap-2">
+                     <Button
+                       size="icon"
+                       variant="ghost"
+                       className="text-destructive h-8 w-8"
+                       onClick={() => rejectPostMutation.mutate(post.id)}
+                       disabled={rejectPostMutation.isPending}
+                     >
+                       <X className="h-4 w-4" />
+                     </Button>
+                     <Button
+                       size="icon"
+                       variant="ghost"
+                       className="text-green-600 h-8 w-8"
+                       onClick={() => approvePostMutation.mutate(post.id)}
+                       disabled={approvePostMutation.isPending}
+                     >
+                       <Check className="h-4 w-4" />
+                     </Button>
+                   </div>
+                 </div>
+               ))
+             )}
+           </div>
+         </CardContent>
+       </Card>
+       
+       {/* Post Detail Modal */}
+       <Dialog open={postDialogOpen} onOpenChange={setPostDialogOpen}>
+         <DialogTrigger asChild>
+           <div className="pointer-events-none" />
+         </DialogTrigger>
+         <DialogContent className="sm:max-w-[500px]">
+           <DialogHeader>
+             <DialogTitle>Post Details</DialogTitle>
+             <DialogDescription>
+               Review the content before taking action.
+             </DialogDescription>
+           </DialogHeader>
+           <div className="space-y-4">
+             {selectedPost && (
+               <>
+                 <div className="space-y-2">
+                   <Label>Author</Label>
+                   <p className="font-medium">{selectedPost.user}</p>
+                 </div>
+                 <div className="space-y-2">
+                   <Label>Time</Label>
+                   <p className="text-muted-foreground">{selectedPost.time}</p>
+                 </div>
+                 <div className="space-y-2">
+                   <Label>Content</Label>
+                   <p className="text-muted-foreground">{selectedPost.content}</p>
+                 </div>
+                 {selectedPost.status === "flagged" && (
+                   <div className="space-y-2">
+                     <Label>Status</Label>
+                     <Badge variant="destructive">Flagged</Badge>
+                   </div>
+                 )}
+               </>
+             )}
+           </div>
+           <DialogFooter>
+             <Button
+               variant="outline"
+               onClick={() => {
+                 setPostDialogOpen(false);
+               }}
+             >
+               Close
+             </Button>
+             {selectedPost && (
+               <>
+                 <Button
+                   size="icon"
+                   variant="ghost"
+                   className="text-destructive h-8 w-8"
+                   onClick={() => {
+                     rejectPostMutation.mutate(selectedPost.id);
+                     setPostDialogOpen(false);
+                   }}
+                   disabled={rejectPostMutation.isPending}
+                 >
+                   <X className="h-4 w-4" />
+                 </Button>
+                 <Button
+                   size="icon"
+                   variant="ghost"
+                   className="text-green-600 h-8 w-8"
+                   onClick={() => {
+                     approvePostMutation.mutate(selectedPost.id);
+                     setPostDialogOpen(false);
+                   }}
+                   disabled={approvePostMutation.isPending}
+                 >
+                   <Check className="h-4 w-4" />
+                 </Button>
+               </>
+             )}
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+     </TabsContent>
 
         {/* --- OFFICIAL NEWS FEED --- */}
         <TabsContent value="news" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: "Annual Alumni Gala 2026",
-                date: "Feb 15, 2026",
-                views: "1.2k",
-              },
-              {
-                title: "New Resource: Career Transition Guide",
-                date: "Jan 28, 2026",
-                views: "850",
-              },
-              {
-                title: "Campus Development Update",
-                date: "Jan 12, 2026",
-                views: "430",
-              },
-            ].map((news, i) => (
-              <Card key={i}>
-                <CardHeader className="pb-2">
-                  <Badge variant="outline" className="w-fit mb-2">
-                    Official
-                  </Badge>
-                  <CardTitle className="text-base line-clamp-1">
-                    {news.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Published: {news.date}</span>
-                    <span>{news.views} reads</span>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="secondary" size="sm" className="">
-                      Edit
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {newsItemsLoading ? (
+              <div className="flex items-center justify-center py-12 col-span-full">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : newsItems.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8 col-span-full">
+                No news articles published yet.
+              </p>
+            ) : (
+              newsItems.map((news) => (
+                <Card key={news.id}>
+                  <CardHeader className="pb-2">
+                    <Badge variant="outline" className="w-fit mb-2">
+                      Official
+                    </Badge>
+                    <CardTitle className="text-base line-clamp-1">
+                      {news.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Published: {format(new Date(news.publishedAt), "MMM dd, yyyy")}</span>
+                      <span>{news.views.toLocaleString()} reads</span>
+                    </div>
+                     <div className="mt-4 flex gap-2">
+                       <Button variant="secondary" size="sm" className=""
+                         onClick={() => {
+                           setEditNewsForm({
+                             title: news.title,
+                             category: news.category,
+                             body: news.content,
+                           });
+                           setEditNewsImages([]);
+                           if (newsImagesRef.current) newsImagesRef.current.value = "";
+                           setEditingNewsId(news.id);
+                           setEditNewsDialogOpen(true);
+                         }}
+                       >
+                         Edit
+                       </Button>
+                       <DropdownMenu>
+                         <DropdownMenuTrigger asChild>
+                           <Button variant="ghost" size="icon" className="h-8">
+                             <MoreVertical className="h-4 w-4" />
+                           </Button>
+                         </DropdownMenuTrigger>
+                         <DropdownMenuContent align="end">
+                           <DropdownMenuItem className="cursor-pointer"
+                             onClick={() => {
+                               setEditNewsForm({
+                                 title: news.title,
+                                 category: news.category,
+                                 body: news.content,
+                               });
+                               setEditNewsImages([]);
+                               if (newsImagesRef.current) newsImagesRef.current.value = "";
+                               setEditingNewsId(news.id);
+                               setEditNewsDialogOpen(true);
+                             }}
+                           >
+                             Edit
+                           </DropdownMenuItem>
+                           <DropdownMenuItem
+                             className="text-destructive cursor-pointer"
+                             onClick={() => {
+                               deleteNewsMutation.mutate(news.id);
+                             }}
+                             disabled={deleteNewsMutation.isPending}
+                           >
+                             Delete
+                           </DropdownMenuItem>
+                         </DropdownMenuContent>
+                       </DropdownMenu>
+                     </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </TabsContent>
         {/* --- EVENTS: Grid & Calendar View --- */}
@@ -633,8 +1093,24 @@ export default function ContentEngagementPage() {
                       </CardDescription>
                       {event.eventStatus === 'pending' && (
                          <div className="pt-2 flex gap-2">
-                            <Button size="sm" variant="outline" className="flex-1 border-green-200 hover:bg-green-50 text-green-700">Approve</Button>
-                            <Button size="sm" variant="outline" className="flex-1 border-red-200 hover:bg-red-50 text-red-700">Decline</Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 border-green-200 hover:bg-green-50 text-green-700"
+                              onClick={() => handleApproveEvent(event.eventId)}
+                              disabled={approveEventMutation.isPending}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 border-red-200 hover:bg-red-50 text-red-700"
+                              onClick={() => handleDeclineEvent(event.eventId)}
+                              disabled={declineEventMutation.isPending}
+                            >
+                              Decline
+                            </Button>
                          </div>
                       )}
                     </CardHeader>
@@ -757,8 +1233,24 @@ export default function ContentEngagementPage() {
                                 <div className="pt-3 flex gap-2 border-t mt-3">
                                   {e.eventStatus === 'pending' ? (
                                     <>
-                                      <Button size="sm" variant="outline" className="flex-1 border-green-200 hover:bg-green-50 text-green-700">Approve</Button>
-                                      <Button size="sm" variant="outline" className="flex-1 border-red-200 hover:bg-red-50 text-red-700">Decline</Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 border-green-200 hover:bg-green-50 text-green-700"
+                                        onClick={() => handleApproveEvent(e.eventId)}
+                                        disabled={approveEventMutation.isPending}
+                                      >
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 border-red-200 hover:bg-red-50 text-red-700"
+                                        onClick={() => handleDeclineEvent(e.eventId)}
+                                        disabled={declineEventMutation.isPending}
+                                      >
+                                        Decline
+                                      </Button>
                                     </>
                                   ) : (
                                     <Button size="sm" variant="outline" className="w-full">Edit Event</Button>
@@ -781,12 +1273,16 @@ export default function ContentEngagementPage() {
         {/* --- RESOURCE LIBRARY --- */}
         <TabsContent value="resources" className="space-y-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle>Resource Performance</CardTitle>
-              <Button size="sm" variant="outline">
-                <Download className="h-4 w-4 mr-2" /> Analytics
-              </Button>
-            </CardHeader>
+             <CardHeader className="flex flex-row items-center justify-between pb-2">
+               <CardTitle>Resource Performance</CardTitle>
+               <Button size="sm" variant="outline"
+                 onClick={() => {
+                   setAnalyticsDialogOpen(true);
+                 }}
+               >
+                 <Download className="h-4 w-4 mr-2" /> Analytics
+               </Button>
+             </CardHeader>
             <CardContent className="p-0">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b">
@@ -809,89 +1305,121 @@ export default function ContentEngagementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    {
-                      name: "Alumni_Business_Directory_2026.pdf",
-                      cat: "Business",
-                      vis: "Verified",
-                      dls: "1,240",
-                    },
-                    {
-                      name: "VC_Pitch_Deck_Master_Template.pptx",
-                      cat: "Investment",
-                      vis: "Verified",
-                      dls: "458",
-                    },
-                    {
-                      name: "Code_of_Conduct_v2.docx",
-                      cat: "Compliance",
-                      vis: "All",
-                      dls: "2.1k",
-                    },
-                    {
-                      name: "Grant_Proposal_Structure.pdf",
-                      cat: "Funding",
-                      vis: "Verified",
-                      dls: "112",
-                    },
-                  ].map((file, i) => (
-                    <tr
-                      key={i}
-                      className="border-b last:border-0 hover:bg-muted/10 transition-colors"
-                    >
-                      <td className="p-4 flex items-center gap-3 font-medium">
-                        <div className="p-2 bg-blue-100 rounded-md">
-                          <FileBox className="h-4 w-4 text-blue-600" />
+                  {resourcesLoading ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center">
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
-                        {file.name}
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="outline" className="text-[10px]">
-                          {file.cat}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {file.vis === "All" ? (
-                            <Globe className="h-3 w-3" />
-                          ) : (
-                            <Lock className="h-3 w-3" />
-                          )}
-                          {file.vis}
-                        </div>
-                      </td>
-                      <td className="p-4 text-center font-bold text-blue-600 font-mono">
-                        {file.dls}
-                      </td>
-                      <td className="p-4 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="cursor-pointer">
-                              Edit Metadata
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
-                              Archive Asset
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </td>
                     </tr>
-                  ))}
+                  ) : resources.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        No resources found.
+                      </td>
+                    </tr>
+                  ) : (
+                    resources.map((resource) => (
+                      <tr
+                        key={resource.id}
+                        className="border-b last:border-0 hover:bg-muted/10 transition-colors"
+                      >
+                        <td className="p-4 flex items-center gap-3 font-medium">
+                          <div className="p-2 bg-blue-100 rounded-md">
+                            <FileBox className="h-4 w-4 text-blue-600" />
+                          </div>
+                          {resource.name}
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline" className="text-[10px]">
+                            {resource.category}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {resource.visibility === "All" ? (
+                              <Globe className="h-3 w-3" />
+                            ) : (
+                              <Lock className="h-3 w-3" />
+                            )}
+                            {resource.visibility}
+                          </div>
+                        </td>
+                        <td className="p-4 text-center font-bold text-blue-600 font-mono">
+                          {resource.downloads}
+                        </td>
+                        <td className="p-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem className="cursor-pointer">
+                                Edit Metadata
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => handleArchiveResource(resource.id)}
+                                disabled={archiveResourceMutation.isPending}
+                              >
+                                Archive Asset
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive cursor-pointer"
+                                onClick={() => handleDeleteResource(resource.id)}
+                                disabled={deleteResourceMutation.isPending}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
+       </Tabs>
+     </div>
+     
+     {/* ANALYTICS DIALOG */}
+     <Dialog open={analyticsDialogOpen} onOpenChange={setAnalyticsDialogOpen}>
+       <DialogTrigger asChild>
+         <div className="pointer-events-none" />
+       </DialogTrigger>
+       <DialogContent className="sm:max-w-[600px]">
+         <DialogHeader>
+           <DialogTitle>Resource Analytics</DialogTitle>
+           <DialogDescription>
+             View download statistics and engagement metrics for resources.
+           </DialogDescription>
+         </DialogHeader>
+         <div className="space-y-6">
+           {/* Placeholder for analytics content */}
+           <div className="text-center py-12">
+             <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mx-auto mb-4" />
+             <p className="text-muted-foreground">Loading analytics data...</p>
+           </div>
+         </div>
+         <DialogFooter>
+           <Button
+             variant="outline"
+             onClick={() => {
+               setAnalyticsDialogOpen(false);
+             }}
+           >
+             Close
+           </Button>
+         </DialogFooter>
+       </DialogContent>
+     </Dialog>
+     </>
+   );
+ }

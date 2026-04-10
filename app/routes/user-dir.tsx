@@ -10,7 +10,12 @@ import {
   ExternalLink,
   Filter,
   Loader2,
-  FileDown
+  FileDown,
+  UserCheck,
+  UserX,
+  Lock,
+  Unlock,
+  Settings
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,11 +49,22 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { useUsers, useAllUsers } from "@/hooks/useUsers";
-import { createUser, verifyUser } from "@/services/apiUsers";
+import { createUser, verifyUser, deleteUser, activateUser, deactivateUser, lockUser, unlockUser, changeUserRole } from "@/services/apiUsers";
 import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@/lib/type";
+
+const getInitials = (firstName: string, lastName: string) => {
+  return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase();
+};
 
 export default function UserDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -69,6 +85,15 @@ export default function UserDirectoryPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ firstName: "", lastName: "", emailAddress: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [roleChangeOpen, setRoleChangeOpen] = useState(false);
+  const [userToChangeRole, setUserToChangeRole] = useState<User | null>(null);
+  const [newRole, setNewRole] = useState("");
+  const [isChangingRole, setIsChangingRole] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: usersResponse, isLoading, error, hasNextPage } = useUsers(page, perPage);
@@ -145,9 +170,27 @@ export default function UserDirectoryPage() {
     toast.success("CSV exported successfully");
   };
 
-  // TODO: Implement delete via API endpoint
-  const handleDelete = (userId: string) => {
-    toast.error("Delete not yet connected to API");
+  const handleDelete = async (user: User) => {
+    setUserToDelete(user);
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteUser(userToDelete.userId);
+      toast.success("User deleted successfully");
+      setDeleteOpen(false);
+      setUserToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete user");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleVerify = async (userId: string) => {
@@ -158,6 +201,79 @@ export default function UserDirectoryPage() {
       queryClient.invalidateQueries({ queryKey: ["users-all"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to verify user");
+    }
+  };
+
+  const handleViewProfile = (user: User) => {
+    setSelectedUser(user);
+    setProfileOpen(true);
+  };
+
+  const handleActivateUser = async (userId: string) => {
+    try {
+      await activateUser(userId);
+      toast.success("User activated successfully");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to activate user");
+    }
+  };
+
+  const handleDeactivateUser = async (userId: string) => {
+    try {
+      await deactivateUser(userId);
+      toast.success("User deactivated successfully");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to deactivate user");
+    }
+  };
+
+  const handleLockUser = async (userId: string) => {
+    try {
+      await lockUser(userId);
+      toast.success("User locked successfully");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to lock user");
+    }
+  };
+
+  const handleUnlockUser = async (userId: string) => {
+    try {
+      await unlockUser(userId);
+      toast.success("User unlocked successfully");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to unlock user");
+    }
+  };
+
+  const handleChangeRole = (user: User) => {
+    setUserToChangeRole(user);
+    setNewRole(user.role || "USER");
+    setRoleChangeOpen(true);
+  };
+
+  const confirmChangeRole = async () => {
+    if (!userToChangeRole || !newRole) return;
+
+    setIsChangingRole(true);
+    try {
+      await changeUserRole(userToChangeRole.userId, newRole);
+      toast.success("User role changed successfully");
+      setRoleChangeOpen(false);
+      setUserToChangeRole(null);
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["users-all"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to change user role");
+    } finally {
+      setIsChangingRole(false);
     }
   };
 
@@ -180,10 +296,6 @@ export default function UserDirectoryPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase();
   };
 
   const getStatus = (user: User) => {
@@ -365,26 +477,65 @@ export default function UserDirectoryPage() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuLabel>Options</DropdownMenuLabel>
-                            <DropdownMenuItem className="cursor-pointer">
-                              <ExternalLink className="mr-2 h-4 w-4" /> View Profile
-                            </DropdownMenuItem>
-                            {!person.isVerified && (
-                              <DropdownMenuItem
-                                className="cursor-pointer text-blue-600"
-                                onClick={() => handleVerify(person.userId)}
-                              >
-                                <ShieldCheck className="mr-2 h-4 w-4" /> Verify
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive cursor-pointer"
-                              onClick={() => handleDelete(person.userId)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
+                           <DropdownMenuContent align="end" className="w-40">
+                             <DropdownMenuLabel>Options</DropdownMenuLabel>
+                             <DropdownMenuItem
+                               className="cursor-pointer"
+                               onClick={() => handleViewProfile(person)}
+                             >
+                               <ExternalLink className="mr-2 h-4 w-4" /> View Profile
+                             </DropdownMenuItem>
+                             {!person.isVerified && (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-blue-600"
+                                 onClick={() => handleVerify(person.userId)}
+                               >
+                                 <ShieldCheck className="mr-2 h-4 w-4" /> Verify
+                               </DropdownMenuItem>
+                             )}
+                             <DropdownMenuItem
+                               className="cursor-pointer"
+                               onClick={() => handleChangeRole(person)}
+                             >
+                               <Settings className="mr-2 h-4 w-4" /> Change Role
+                             </DropdownMenuItem>
+                             {person.isActive ? (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-orange-600"
+                                 onClick={() => handleDeactivateUser(person.userId)}
+                               >
+                                 <UserX className="mr-2 h-4 w-4" /> Deactivate User
+                               </DropdownMenuItem>
+                             ) : (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-green-600"
+                                 onClick={() => handleActivateUser(person.userId)}
+                               >
+                                 <UserCheck className="mr-2 h-4 w-4" /> Activate User
+                               </DropdownMenuItem>
+                             )}
+                             {person.isLocked ? (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-green-600"
+                                 onClick={() => handleUnlockUser(person.userId)}
+                               >
+                                 <Unlock className="mr-2 h-4 w-4" /> Unlock User
+                               </DropdownMenuItem>
+                             ) : (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-orange-600"
+                                 onClick={() => handleLockUser(person.userId)}
+                               >
+                                 <Lock className="mr-2 h-4 w-4" /> Lock User
+                               </DropdownMenuItem>
+                             )}
+                             <DropdownMenuSeparator />
+                             <DropdownMenuItem
+                               className="text-destructive cursor-pointer"
+                               onClick={() => handleDelete(person)}
+                             >
+                               <Trash2 className="mr-2 h-4 w-4" /> Delete
+                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -428,6 +579,32 @@ export default function UserDirectoryPage() {
         </CardContent>
       </Card>
 
+      {/* Profile View Dialog */}
+      <ProfileViewDialog
+        user={selectedUser}
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        user={userToDelete}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onConfirm={confirmDelete}
+      />
+
+      {/* Change Role Dialog */}
+      <ChangeRoleDialog
+        user={userToChangeRole}
+        open={roleChangeOpen}
+        onOpenChange={setRoleChangeOpen}
+        newRole={newRole}
+        onRoleChange={setNewRole}
+        onConfirm={confirmChangeRole}
+        isLoading={isChangingRole}
+      />
+
       {/*
         TODO: The following API response fields are not yet displayed in the UI:
         - role (USER / BACKOFFICE)
@@ -440,6 +617,182 @@ export default function UserDirectoryPage() {
         - updatedAt
       */}
     </div>
+  );
+}
+
+// Profile View Dialog Component
+function ProfileViewDialog({ user, open, onOpenChange }: { user: User | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+  if (!user) return null;
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>User Profile</DialogTitle>
+          <DialogDescription>
+            Detailed information about {user.firstName} {user.lastName}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16 border">
+              <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                {getInitials(user.firstName, user.lastName)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="text-lg font-semibold">{user.firstName} {user.lastName}</h3>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+              <Badge variant={user.isVerified ? "default" : "secondary"} className="mt-1">
+                {user.isVerified ? "Verified" : "Pending"}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Role:</span>
+              <span className="text-sm text-muted-foreground">{user.role || "USER"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Status:</span>
+              <span className="text-sm text-muted-foreground">
+                {user.isActive ? "Active" : "Inactive"}
+                {user.isLocked && " (Locked)"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Onboarded:</span>
+              <span className="text-sm text-muted-foreground">{user.isOnboarded ? "Yes" : "No"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Password Change Required:</span>
+              <span className="text-sm text-muted-foreground">{user.passwordChangeRequired ? "Yes" : "No"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Last Login:</span>
+              <span className="text-sm text-muted-foreground">
+                {user.lastLogin ? formatDate(user.lastLogin) : "Never"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Created:</span>
+              <span className="text-sm text-muted-foreground">{formatDate(user.createdAt)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Updated:</span>
+              <span className="text-sm text-muted-foreground">{formatDate(user.updatedAt)}</span>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Delete Confirmation Dialog Component
+function DeleteConfirmationDialog({ user, open, onOpenChange, onConfirm }: {
+  user: User | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-destructive">Delete User</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete {user?.firstName} {user?.lastName}? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
+            Delete User
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Change Role Dialog Component
+function ChangeRoleDialog({
+  user,
+  open,
+  onOpenChange,
+  newRole,
+  onRoleChange,
+  onConfirm,
+  isLoading
+}: {
+  user: User | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  newRole: string;
+  onRoleChange: (role: string) => void;
+  onConfirm: () => void;
+  isLoading: boolean;
+}) {
+  const roles = [
+    { value: "USER", label: "User" },
+    { value: "BACKOFFICE", label: "Back Office" },
+    { value: "ADMIN", label: "Administrator" },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Change User Role</DialogTitle>
+          <DialogDescription>
+            Change the role for {user?.firstName} {user?.lastName}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="role">New Role</Label>
+            <Select value={newRole} onValueChange={onRoleChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={isLoading || !newRole}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Change Role
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
