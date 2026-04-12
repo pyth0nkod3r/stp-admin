@@ -1,4 +1,4 @@
-import { fetchUsers } from "@/services/apiUsers";
+import { fetchUsers, fetchUserProfile } from "@/services/apiUsers";
 import { useUsersStore } from "@/stores/usersStore";
 import { useEffect, useState } from "react";
 
@@ -11,7 +11,6 @@ export function useUsers(page: number = 1, perPage: number = 10) {
   const setError = useUsersStore((state) => state.setError);
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
@@ -19,7 +18,7 @@ export function useUsers(page: number = 1, perPage: number = 10) {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || hasInitialized) return;
+    if (!isAuthenticated) return;
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -36,8 +35,7 @@ export function useUsers(page: number = 1, perPage: number = 10) {
     };
 
     fetchData();
-    setHasInitialized(true);
-  }, [isAuthenticated, hasInitialized]);
+  }, [isAuthenticated, page, perPage, setUsers, setIsLoading, setError]);
 
   const allItems = users ?? [];
   const hasNextPage = allItems.length > perPage;
@@ -60,7 +58,7 @@ export function useAllUsers() {
   const setError = useUsersStore((state) => state.setError);
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
@@ -68,7 +66,7 @@ export function useAllUsers() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || hasInitialized) return;
+    if (!isAuthenticated || hasFetched) return;
 
     const fetchData = async () => {
       setAllUsersLoading(true);
@@ -85,12 +83,50 @@ export function useAllUsers() {
     };
 
     fetchData();
-    setHasInitialized(true);
-  }, [isAuthenticated, hasInitialized]);
+    setHasFetched(true);
+  }, [isAuthenticated, hasFetched, setAllUsers, setAllUsersLoading, setError]);
 
   return {
     data: { data: allUsers },
     isLoading: allUsersLoading,
+    error,
+  };
+}
+
+export function useUserProfile(userId: string | null) {
+  const [profile, setProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
+    setIsAuthenticated(!!token);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetchUserProfile(userId);
+        setProfile(response.data);
+      } catch (error: any) {
+        setError(error?.message || "Failed to fetch user profile");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [userId, isAuthenticated]);
+
+  return {
+    profile,
+    isLoading,
     error,
   };
 }

@@ -12,7 +12,7 @@ export default [
     route("admin/dashboard", "routes/dashboard.tsx"),
     route("admin/users", "routes/user-dir.tsx"),
     // route("admin/riders/:id", "routes/riders-details.tsx"),
-    route("admin/verification", "routes/verification-queue.tsx"),
+    // route("admin/verification", "routes/verification-queue.tsx"), // NOTE: Verification queue no longer needed
     // route("admin/drivers/:id", "routes/drivers-details.tsx"),
     route("admin/opportunities", "routes/opportunities.tsx"),
     // route("admin/trips/:rideId", "routes/trip-details.tsx"),

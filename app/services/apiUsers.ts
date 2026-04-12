@@ -53,7 +53,7 @@ export async function verifyUser(userId: string): Promise<void> {
   const response = await fetch(
     `${API_BASE_URL}/backoffice/users/${userId}/verify`,
     {
-      method: "PATCH",
+      method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
@@ -97,39 +97,253 @@ export async function createUser(payload: CreateUserPayload): Promise<void> {
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  // Mock implementation - in real app, this would call the actual API
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-  console.log(`Mock: Deleted user with ID: ${userId}`);
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/users/${userId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to delete user");
+  }
 }
 
 export async function activateUser(userId: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Activated user with ID: ${userId}`);
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/users/${userId}/activate`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to activate user");
+  }
 }
 
 export async function deactivateUser(userId: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Deactivated user with ID: ${userId}`);
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/users/${userId}/deactivate`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to deactivate user");
+  }
 }
 
 export async function lockUser(userId: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Locked user with ID: ${userId}`);
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/users/${userId}/lock`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to lock user");
+  }
 }
 
 export async function unlockUser(userId: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Unlocked user with ID: ${userId}`);
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/users/${userId}/unlock`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to unlock user");
+  }
 }
 
 export async function changeUserRole(userId: string, role: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Changed user ${userId} role to: ${role}`);
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/users/${userId}/role`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ role }),
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to change user role");
+  }
+}
+
+export interface UserProfileResponse {
+  status: boolean;
+  message: string;
+  data: {
+    userId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    createdAt: string;
+    lastLogin: string | null;
+    title: string | null;
+    companyName: string | null;
+    location: string | null;
+    cohort: string | null;
+    sector: string[];
+    skills: string[];
+    elevatorPitch: string | null;
+    companyStage: string | null;
+    businessModel: string | null;
+    linkedin: string | null;
+    needs: string[];
+    offers: string[];
+    goals: string | null;
+    contactVisibility: string;
+    language: string;
+    theme: string;
+    emailNotificationsEnabled: string | boolean;
+    isDeactivated: string | boolean;
+    isActive: boolean;
+    isLocked: boolean;
+    isVerified: boolean;
+    isOnboarded: boolean;
+    profileImagePath: string | null;
+  };
+}
+
+export async function fetchUserProfile(userId: string): Promise<UserProfileResponse> {
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/users/${userId}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to fetch user profile");
+  }
+
+  const data: UserProfileResponse = await response.json();
+  return data;
+}
+
+export async function rejectUserVerification(userId: string): Promise<void> {
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/users/${userId}/approve`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ action: "reject" }),
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to reject user");
+  }
 }
 
 // Content Management APIs

@@ -33,7 +33,7 @@ import { toast } from "sonner";
 const mainItems = [
   { title: "Overview", url: "/admin/dashboard", icon: LayoutDashboard },
   { title: "User Directory", url: "/admin/users", icon: Users },
-  { title: "Verification Queue", url: "/admin/verification", icon: ShieldCheck },
+  // { title: "Verification Queue", url: "/admin/verification", icon: ShieldCheck }, // NOTE: No longer needed
   { title: "Opportunities", url: "/admin/opportunities", icon: Briefcase },
   { title: "Content & Engagement", url: "/admin/content", icon: Megaphone },
   { title: "System & Management", url: "/admin/system", icon: Settings },

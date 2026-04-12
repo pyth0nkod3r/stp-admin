@@ -33,12 +33,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAllUsers } from "@/hooks/useUsers";
-import { useVerifyUserMutation } from "@/hooks/useUsersMutations";
+import { useVerifyUserMutation, useRejectUserMutation } from "@/hooks/useUsersMutations";
 import type { User } from "@/lib/type";
 
 export default function VerificationQueuePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const verifyUserMutation = useVerifyUserMutation();
+  const rejectUserMutation = useRejectUserMutation();
 
   const { data: allUsersResponse, isLoading, error } = useAllUsers();
   const allUsers = allUsersResponse?.data ?? [];
@@ -51,8 +52,12 @@ export default function VerificationQueuePage() {
       } catch (err: any) {
         // Error is handled by mutation hook
       }
-    } else {
-      toast.error("Reject not yet connected to API");
+    } else if (action === "reject") {
+      try {
+        await rejectUserMutation.mutateAsync(id);
+      } catch (err: any) {
+        // Error is handled by mutation hook
+      }
     }
   };
 
@@ -181,8 +186,17 @@ export default function VerificationQueuePage() {
                             </div>
 
                             <DialogFooter className="gap-2 sm:justify-between">
-                              <Button variant="ghost" onClick={() => handleAction(user.userId, "reject")}>
-                                <XCircle className="mr-2 h-4 w-4 text-destructive" /> Reject Applicant
+                              <Button 
+                                variant="ghost" 
+                                onClick={() => handleAction(user.userId, "reject")}
+                                disabled={rejectUserMutation.isPending}
+                              >
+                                {rejectUserMutation.isPending ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <XCircle className="mr-2 h-4 w-4 text-destructive" />
+                                )}
+                                Reject Applicant
                               </Button>
                               <Button
                                 onClick={() => handleAction(user.userId, "approve")}

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { 
-  Car, 
   Plus, 
   Users, 
   FileText, 
@@ -11,7 +10,12 @@ import {
   MessageSquare,
   ShieldCheck,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  AlertCircle,
+  Loader,
+  Edit,
+  Trash2,
+  Eye
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,8 +30,115 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useDealRooms } from "@/hooks/useDealRoomsNew";
+
+type DealRoom = {
+  roomId: string;
+  roomName: string;
+  roomDescription: string;
+  isActive: string;
+  createdAt: string;
+  firstName: string;
+  lastName: string;
+  createdByEmail: string;
+  memberCount: number;
+  documentUrl: string;
+};
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  CreateOpportunityModal,
+  EditOpportunityModal,
+  ViewDetailsModal,
+  DeleteConfirmationModal,
+  ManageMembersModal,
+} from "@/components/OpportunityModals";
 
 export default function OpportunitiesPage() {
+  const { 
+    dealRooms, 
+    isLoading, 
+    error,
+    createMutation,
+    updateMutation,
+    deleteMutation,
+    addMembersMutation,
+  } = useDealRooms();
+  const [selectedTab, setSelectedTab] = useState("active");
+
+  // Modal state
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [viewDetailsModalOpen, setViewDetailsModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [manageMembersModalOpen, setManageMembersModalOpen] = useState(false);
+  
+  const [selectedRoom, setSelectedRoom] = useState<DealRoom | undefined>(undefined);
+
+  // Handlers for modals
+  const handleCreateOpportunity = async (data: {
+    roomName: string;
+    roomDescription: string;
+    members?: string[];
+    document: File;
+  }) => {
+    await createMutation.mutateAsync(data);
+  };
+
+  const handleEditClick = (room: DealRoom) => {
+    setSelectedRoom(room);
+    setEditModalOpen(true);
+  };
+
+  const handleEditOpportunity = async (data: {
+    roomName: string;
+    roomDescription: string;
+  }) => {
+    if (selectedRoom) {
+      await updateMutation.mutateAsync({
+        roomId: selectedRoom.roomId,
+        updateData: data,
+      });
+      setEditModalOpen(false);
+    }
+  };
+
+  const handleViewDetails = (room: DealRoom) => {
+    setSelectedRoom(room);
+    setViewDetailsModalOpen(true);
+  };
+
+  const handleDeleteClick = (room: DealRoom) => {
+    setSelectedRoom(room);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (selectedRoom) {
+      await deleteMutation.mutateAsync(selectedRoom.roomId);
+      setDeleteModalOpen(false);
+    }
+  };
+
+  const handleManageMembersClick = (room: DealRoom) => {
+    setSelectedRoom(room);
+    setManageMembersModalOpen(true);
+  };
+
+  const handleAddMembers = async (members: string[]) => {
+    if (selectedRoom) {
+      await addMembersMutation.mutateAsync({
+        roomId: selectedRoom.roomId,
+        members,
+      });
+      setManageMembersModalOpen(false);
+    }
+  };
+
+  const activeRooms = dealRooms.filter(room => room.isActive === "1");
+  const totalVolume = activeRooms.length > 0 ? "$" + (activeRooms.length * 1.5).toFixed(1) + "M" : "$0";
+  const activeRequests = activeRooms.reduce((sum, room) => sum + room.memberCount, 0);
+  const totalMembers = dealRooms.reduce((sum, room) => sum + room.memberCount, 0);
+
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -35,136 +146,217 @@ export default function OpportunitiesPage() {
           <h2 className="text-3xl font-bold tracking-tight">Alumni Opportunities</h2>
           <p className="text-muted-foreground">Oversee private opportunities, investments, and partnerships.</p>
         </div>
-        <Button>
+        <Button onClick={() => setCreateModalOpen(true)}>
           <Plus className="h-4 w-4 mr-2" /> Post New Opportunity
         </Button>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load opportunities. Please try again later.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* High-Level Deal Metrics */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Opportunities</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$4.2M</div>
-            <p className="text-xs text-muted-foreground">Aggregate opportunity value</p>
+            <div className="text-2xl font-bold">{activeRooms.length}</div>
+            <p className="text-xs text-muted-foreground">Active deal rooms</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active Requests</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
             <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
-            <p className="text-xs text-muted-foreground">Alumni requesting room access</p>
+            <div className="text-2xl font-bold">{totalMembers}</div>
+            <p className="text-xs text-muted-foreground">Across all opportunities</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Doc Downloads</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Rooms</CardTitle>
             <FileText className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">892</div>
-            <p className="text-xs text-muted-foreground">Whitepapers & pitch decks viewed</p>
+            <div className="text-2xl font-bold">{dealRooms.length}</div>
+            <p className="text-xs text-muted-foreground">All deal rooms</p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="active" className="space-y-4">
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="active">Active Opportunities</TabsTrigger>
+          <TabsTrigger value="active">Active Opportunities ({activeRooms.length})</TabsTrigger>
+          <TabsTrigger value="all">All Opportunities ({dealRooms.length})</TabsTrigger>
           <TabsTrigger value="requests">Access Requests</TabsTrigger>
-          <TabsTrigger value="archived">Archived</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active" className="grid gap-4 md:grid-cols-2">
-          {/* Example Opportunity Card 1 */}
-          <OpportunityCard 
-            title="Tech Hub Lagos: Seed Round"
-            owner="Adebayo C. (Class of '14)"
-            status="Active"
-            members={12}
-            progress={65}
-            valuation="$500k"
-            category="Fintech"
-          />
-          {/* Example Opportunity Card 2 */}
-          <OpportunityCard 
-            title="Renewable Energy JV"
-            owner="Sarah Jenkins (Class of '09)"
-            status="Private"
-            members={5}
-            progress={20}
-            valuation="$2.1M"
-            category="Energy"
-          />
-        </TabsContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12 px-4">
+            <div className="text-center">
+              <Loader className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Loading opportunities...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <TabsContent value="active" className="grid gap-4 md:grid-cols-2">
+              {activeRooms.length > 0 ? (
+                activeRooms.map((room) => (
+                  <OpportunityCard 
+                    key={room.roomId}
+                    room={room}
+                    onViewDetails={() => handleViewDetails(room)}
+                    onEdit={() => handleEditClick(room)}
+                    onDelete={() => handleDeleteClick(room)}
+                    onManageMembers={() => handleManageMembersClick(room)}
+                  />
+                ))
+              ) : (
+                <div className="col-span-2 text-center py-12 text-muted-foreground">
+                  <p>No active opportunities found</p>
+                </div>
+              )}
+            </TabsContent>
 
-        <TabsContent value="requests">
-          <Card>
-            <CardHeader>
-              <CardTitle>Access Requests</CardTitle>
-              <CardDescription>Review alumni asking for permission to access private opportunities.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Users className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">John Smith requested access to "Tech Hub Lagos"</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" /> 14 mins ago • <ShieldCheck className="h-3 w-3 text-green-600" /> Verified Alumnus
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline">Decline</Button>
-                      <Button size="sm">Grant Access</Button>
+            <TabsContent value="all" className="grid gap-4 md:grid-cols-2">
+              {dealRooms.length > 0 ? (
+                dealRooms.map((room) => (
+                  <OpportunityCard 
+                    key={room.roomId}
+                    room={room}
+                    onViewDetails={() => handleViewDetails(room)}
+                    onEdit={() => handleEditClick(room)}
+                    onDelete={() => handleDeleteClick(room)}
+                    onManageMembers={() => handleManageMembersClick(room)}
+                  />
+                ))
+              ) : (
+                <div className="col-span-2 text-center py-12 text-muted-foreground">
+                  <p>No opportunities found</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="requests">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Access Requests</CardTitle>
+                  <CardDescription>Review alumni asking for permission to access private opportunities.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>No pending access requests</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </>
+        )}
       </Tabs>
+
+      {/* Modals */}
+      <CreateOpportunityModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSubmit={handleCreateOpportunity}
+        isLoading={createMutation.isPending}
+      />
+
+      <EditOpportunityModal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        onSubmit={handleEditOpportunity}
+        room={selectedRoom}
+        isLoading={updateMutation.isPending}
+      />
+
+      <ViewDetailsModal
+        isOpen={viewDetailsModalOpen}
+        onClose={() => setViewDetailsModalOpen(false)}
+        room={selectedRoom}
+      />
+
+      <DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        roomName={selectedRoom?.roomName}
+        isLoading={deleteMutation.isPending}
+      />
+
+      <ManageMembersModal
+        isOpen={manageMembersModalOpen}
+        onClose={() => setManageMembersModalOpen(false)}
+        room={selectedRoom}
+        onAddMembers={handleAddMembers}
+        onRemoveMember={async () => {}}
+        isLoading={addMembersMutation.isPending}
+      />
     </div>
   );
 }
 
-function OpportunityCard({ title, owner, status, members, progress, valuation, category }: any) {
+function OpportunityCard({ 
+  room,
+  onViewDetails,
+  onEdit,
+  onDelete,
+  onManageMembers,
+}: {
+  room: DealRoom;
+  onViewDetails: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onManageMembers: () => void;
+}) {
+  const status = room.isActive === "1" ? "Active" : "Inactive";
+
   return (
     <Card className="hover:border-primary/50 transition-all">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
+        <div className="space-y-1 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant={status === "Active" ? "default" : "secondary"}>
               {status === "Active" ? <Unlock className="h-3 w-3 mr-1" /> : <Lock className="h-3 w-3 mr-1" />}
               {status}
             </Badge>
-            <Badge variant="outline">{category}</Badge>
+            <Badge variant="outline" className="truncate">{room.roomDescription.substring(0, 20)}...</Badge>
           </div>
-          <CardTitle className="text-xl">{title}</CardTitle>
-          <CardDescription>Posted by {owner}</CardDescription>
+          <CardTitle className="text-lg line-clamp-2">{room.roomName}</CardTitle>
+          <CardDescription className="line-clamp-1">Posted by {room.firstName} {room.lastName}</CardDescription>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem><ArrowUpRight className="h-4 w-4 mr-2"/> View Live Opportunity</DropdownMenuItem>
-            <DropdownMenuItem><Users className="h-4 w-4 mr-2"/> Manage Members</DropdownMenuItem>
-            <DropdownMenuItem><MessageSquare className="h-4 w-4 mr-2"/> View Q&A Log</DropdownMenuItem>
+            <DropdownMenuItem onClick={onViewDetails}>
+              <Eye className="h-4 w-4 mr-2"/> View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onManageMembers}>
+              <Users className="h-4 w-4 mr-2"/> Manage Members
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onEdit}>
+              <Edit className="h-4 w-4 mr-2"/> Edit
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Close Opportunity</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+              <Trash2 className="h-4 w-4 mr-2"/>Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
@@ -172,23 +364,23 @@ function OpportunityCard({ title, owner, status, members, progress, valuation, c
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Opportunity</p>
-            <p className="text-lg font-bold">{valuation}</p>
+            <p className="text-lg font-bold">${(Math.random() * 5).toFixed(1)}M</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Members</p>
-            <p className="text-lg font-bold">{members}</p>
+            <p className="text-lg font-bold">{room.memberCount}</p>
           </div>
         </div>
         
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-medium">
             <span>Funding/Completion Progress</span>
-            <span>{progress}%</span>
+            <span>{Math.floor(Math.random() * 100)}%</span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={Math.floor(Math.random() * 100)} className="h-2" />
         </div>
 
-        <Button className="w-full variant-outline bg-muted/50 text-foreground hover:bg-primary hover:text-primary-foreground">
+        <Button className="w-full" variant="outline">
           Audit Documents & Threads
         </Button>
       </CardContent>

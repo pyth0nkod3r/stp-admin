@@ -10,6 +10,7 @@ import {
   lockUser,
   unlockUser,
   changeUserRole,
+  rejectUserVerification,
   type CreateUserPayload,
 } from "@/services/apiUsers";
 
@@ -140,6 +141,21 @@ export function useChangeUserRoleMutation() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to change user role");
+    },
+  });
+}
+
+export function useRejectUserMutation() {
+  const store = useUsersStore();
+
+  return useMutation({
+    mutationFn: (userId: string) => rejectUserVerification(userId),
+    onSuccess: (_data, userId) => {
+      store.removeUser(userId);
+      toast.success("Applicant rejected successfully");
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to reject user");
     },
   });
 }

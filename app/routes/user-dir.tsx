@@ -57,7 +57,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useUsers, useAllUsers } from "@/hooks/useUsers";
+import { useUsers, useAllUsers, useUserProfile } from "@/hooks/useUsers";
 import {
   useCreateUserMutation,
   useVerifyUserMutation,
@@ -403,13 +403,14 @@ export default function UserDirectoryPage() {
                   {/* TODO: Add "Major" column when API provides major/department */}
                   <TableHead className="hidden lg:table-cell">Major</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Role</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       <div className="flex items-center justify-center gap-2 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Loading users...
@@ -418,7 +419,7 @@ export default function UserDirectoryPage() {
                   </TableRow>
                 ) : error ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                    <TableCell colSpan={6} className="h-24 text-center text-destructive">
                       Failed to load users. Please try again.
                     </TableCell>
                   </TableRow>
@@ -453,6 +454,9 @@ export default function UserDirectoryPage() {
                         } className="text-[10px] sm:text-xs">
                           {getStatus(person)}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium">{person.role || "USER"}</span>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -606,79 +610,200 @@ export default function UserDirectoryPage() {
 
 // Profile View Dialog Component
 function ProfileViewDialog({ user, open, onOpenChange }: { user: User | null; open: boolean; onOpenChange: (open: boolean) => void }) {
-  if (!user) return null;
+  const { profile, isLoading, error } = useUserProfile(user?.userId ?? null);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Not available";
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
   };
 
+  const renderArrayField = (arr: any[], label: string) => {
+    if (!arr || arr.length === 0) return null;
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-semibold text-muted-foreground uppercase">{label}</p>
+        <div className="flex flex-wrap gap-1">
+          {arr.map((item, idx) => (
+            <Badge key={idx} variant="outline" className="text-xs">
+              {item}
+            </Badge>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  if (!user) return null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>User Profile</DialogTitle>
           <DialogDescription>
-            Detailed information about {user.firstName} {user.lastName}
+            Complete profile details
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 border">
-              <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                {getInitials(user.firstName, user.lastName)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="text-lg font-semibold">{user.firstName} {user.lastName}</h3>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
-              <Badge variant={user.isVerified ? "default" : "secondary"} className="mt-1">
-                {user.isVerified ? "Verified" : "Pending"}
-              </Badge>
-            </div>
-          </div>
 
-          <div className="grid gap-3">
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Role:</span>
-              <span className="text-sm text-muted-foreground">{user.role || "USER"}</span>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="text-sm text-destructive py-4">
+            {error}
+          </div>
+        ) : profile ? (
+          <div className="space-y-6">
+            {/* Header Section */}
+            <div className="flex items-start gap-4 pb-4 border-b">
+              <Avatar className="h-20 w-20 border-2">
+                {profile.profileImagePath ? (
+                  <img src={profile.profileImagePath} alt={`${profile.firstName} ${profile.lastName}`} />
+                ) : (
+                  <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                    {getInitials(profile.firstName, profile.lastName)}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold">{profile.firstName} {profile.lastName}</h2>
+                <p className="text-sm text-muted-foreground mb-2">{profile.email}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={profile.isVerified ? "default" : "secondary"}>
+                    {profile.isVerified ? "✓ Verified" : "Pending"}
+                  </Badge>
+                  <Badge variant={profile.isActive ? "default" : "destructive"}>
+                    {profile.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  {profile.isLocked && <Badge variant="destructive">Locked</Badge>}
+                  <Badge variant="outline">{profile.role}</Badge>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Status:</span>
-              <span className="text-sm text-muted-foreground">
-                {user.isActive ? "Active" : "Inactive"}
-                {user.isLocked && " (Locked)"}
-              </span>
+
+            {/* Account Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Member Since</p>
+                <p className="text-sm">{formatDate(profile.createdAt)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Last Login</p>
+                <p className="text-sm">{formatDate(profile.lastLogin)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Cohort</p>
+                <p className="text-sm">{profile.cohort || "Not specified"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Location</p>
+                <p className="text-sm">{profile.location || "Not specified"}</p>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Onboarded:</span>
-              <span className="text-sm text-muted-foreground">{user.isOnboarded ? "Yes" : "No"}</span>
+
+            {/* Professional Info */}
+            {(profile.title || profile.companyName || profile.companyStage || profile.businessModel) && (
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Professional Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {profile.title && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Title</p>
+                      <p className="text-sm">{profile.title}</p>
+                    </div>
+                  )}
+                  {profile.companyName && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Company</p>
+                      <p className="text-sm">{profile.companyName}</p>
+                    </div>
+                  )}
+                  {profile.companyStage && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Company Stage</p>
+                      <p className="text-sm">{profile.companyStage}</p>
+                    </div>
+                  )}
+                  {profile.businessModel && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Business Model</p>
+                      <p className="text-sm">{profile.businessModel}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Skills & Sectors */}
+            {(profile.sector?.length > 0 || profile.skills?.length > 0) && (
+              <div className="border-t pt-4 space-y-3">
+                {renderArrayField(profile.sector, "Sectors")}
+                {renderArrayField(profile.skills, "Skills")}
+              </div>
+            )}
+
+            {/* Bio & Goals */}
+            {(profile.elevatorPitch || profile.goals) && (
+              <div className="border-t pt-4 space-y-3">
+                {profile.elevatorPitch && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Elevator Pitch</p>
+                    <p className="text-sm">{profile.elevatorPitch}</p>
+                  </div>
+                )}
+                {profile.goals && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Goals</p>
+                    <p className="text-sm">{profile.goals}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Needs & Offers */}
+            {(profile.needs?.length > 0 || profile.offers?.length > 0) && (
+              <div className="border-t pt-4 space-y-3">
+                {renderArrayField(profile.needs, "Looking For (Needs)")}
+                {renderArrayField(profile.offers, "What They Offer")}
+              </div>
+            )}
+
+            {/* Social & Contact */}
+            <div className="border-t pt-4 grid grid-cols-2 gap-4">
+              {profile.linkedin && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">LinkedIn</p>
+                  <a href={`https://${profile.linkedin}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all">
+                    {profile.linkedin}
+                  </a>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Contact Visibility</p>
+                <p className="text-sm">{profile.contactVisibility}</p>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Password Change Required:</span>
-              <span className="text-sm text-muted-foreground">{user.passwordChangeRequired ? "Yes" : "No"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Last Login:</span>
-              <span className="text-sm text-muted-foreground">
-                {user.lastLogin ? formatDate(user.lastLogin) : "Never"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Created:</span>
-              <span className="text-sm text-muted-foreground">{formatDate(user.createdAt)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Updated:</span>
-              <span className="text-sm text-muted-foreground">{formatDate(user.updatedAt)}</span>
+
+            {/* Settings */}
+            <div className="border-t pt-4 bg-muted/30 p-3 rounded">
+              <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">User Settings</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Language: <span className="font-medium">{profile.language}</span></div>
+                <div>Theme: <span className="font-medium">{profile.theme}</span></div>
+                <div>Email Notifications: <span className="font-medium">{profile.emailNotificationsEnabled ? "Enabled" : "Disabled"}</span></div>
+                <div>Onboarded: <span className="font-medium">{profile.isOnboarded ? "Yes" : "No"}</span></div>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
+
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)}>Close</Button>
         </DialogFooter>
@@ -737,7 +862,6 @@ function ChangeRoleDialog({
   const roles = [
     { value: "USER", label: "User" },
     { value: "BACKOFFICE", label: "Back Office" },
-    { value: "ADMIN", label: "Administrator" },
   ];
 
   return (
