@@ -79,7 +79,7 @@ export const useDealRooms = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: { roomName: string; roomDescription: string; members?: string[]; document: File }) =>
+    mutationFn: (data: { roomName: string; roomDescription: string; members?: string[]; document: File; images?: File[] }) =>
       apiDealRooms.createDealRoom(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dealRooms"] });

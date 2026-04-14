@@ -80,6 +80,7 @@ export default function OpportunitiesPage() {
     roomDescription: string;
     members?: string[];
     document: File;
+    images?: File[];
   }) => {
     await createMutation.mutateAsync(data);
   };

@@ -542,61 +542,122 @@ export async function declineEvent(eventId: string): Promise<void> {
 }
 
 export interface Resource {
-  id: string;
-  name: string;
+  id: string; // resourceId
+  name: string; // title
+  description?: string;
   category: string;
-  visibility: string;
-  downloads: string;
+  filePath?: string; // resourceFilePath
+  createdAt?: string;
+  uploaderFirstName?: string | null;
+  uploaderLastName?: string | null;
+  uploaderEmail?: string | null;
+  visibility: string; // 'All' | 'Verified' etc.
+  downloads: string; // display string
   status: 'active' | 'archived';
 }
 
-export async function getResources(): Promise<Resource[]> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return [
-    {
-      id: '1',
-      name: 'Alumni_Business_Directory_2026.pdf',
-      category: 'Business',
-      visibility: 'Verified',
-      downloads: '1,240',
-      status: 'active',
+export async function getResources(
+  opts: { page?: number; limit?: number; sortBy?: string } = { page: 1, limit: 20, sortBy: 'newest' }
+): Promise<Resource[]> {
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const page = opts.page ?? 1;
+  const limit = opts.limit ?? 20;
+  const sortBy = opts.sortBy ?? 'newest';
+
+  const url = `${API_BASE_URL}/backoffice/content/resources?page=${page}&limit=${limit}&sortBy=${encodeURIComponent(
+    sortBy
+  )}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
     },
-    {
-      id: '2',
-      name: 'VC_Pitch_Deck_Master_Template.pptx',
-      category: 'Investment',
-      visibility: 'Verified',
-      downloads: '458',
-      status: 'active',
-    },
-    {
-      id: '3',
-      name: 'Code_of_Conduct_v2.docx',
-      category: 'Compliance',
-      visibility: 'All',
-      downloads: '2.1k',
-      status: 'active',
-    },
-    {
-      id: '4',
-      name: 'Grant_Proposal_Structure.pdf',
-      category: 'Funding',
-      visibility: 'Verified',
-      downloads: '112',
-      status: 'active',
-    },
-  ];
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to fetch resources");
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!payload) return [];
+
+  const dataArray = Array.isArray(payload) ? payload : Array.isArray(payload.data) ? payload.data : [];
+
+  return dataArray.map((r: any) => ({
+    id: r.resourceId || r.id || "",
+    name: r.title || r.name || "",
+    description: r.description || "",
+    category: r.category || "",
+    filePath: r.resourceFilePath || r.filePath || "",
+    createdAt: r.createdAt || r.created_at || "",
+    uploaderFirstName: r.firstName ?? null,
+    uploaderLastName: r.lastName ?? null,
+    uploaderEmail: r.email ?? null,
+    // derive visibility: if uploader email present assume Verified, else All
+    visibility: r.visibility || (r.email ? "Verified" : "All"),
+    downloads: r.downloads ? String(r.downloads) : "—",
+    status: r.status === "archived" ? "archived" : "active",
+  } as Resource));
 }
 
 export async function archiveResource(resourceId: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Archived resource with ID: ${resourceId}`);
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/content/resources/${resourceId}/archive`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to archive resource");
+  }
 }
 
 export async function deleteResource(resourceId: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Deleted resource with ID: ${resourceId}`);
+  const token = localStorage.getItem("stp_token");
+  if (!token) throw new Error("Not authenticated");
+
+  const response = await fetch(
+    `${API_BASE_URL}/backoffice/content/resources/${resourceId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "Failed to delete resource");
+  }
 }

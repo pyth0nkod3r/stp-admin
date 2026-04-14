@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { X, Loader, Users, Trash2, Upload, File } from "lucide-react";
+import { X, Loader, Upload, File } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,7 @@ type DealRoom = {
 interface CreateOpportunityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { roomName: string; roomDescription: string; document?: File }) => Promise<void>;
+  onSubmit: (data: { roomName: string; roomDescription: string; document: File; images?: File[] }) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -47,39 +47,75 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
     roomName: "",
     roomDescription: "",
   });
-  const [document, setDocument] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type (PDF, DOC, DOCX, etc.)
-      const validTypes = [
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ];
-      
-      if (!validTypes.includes(file.type)) {
-        toast.error("Please upload a PDF or Word document");
-        return;
-      }
+  const DOCUMENT_TYPES = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
 
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error("File size must be less than 10MB");
-        return;
-      }
+  const handleFilesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []);
+    if (selected.length === 0) return;
 
-      setDocument(file);
-    }
+    const accepted: File[] = [];
+
+    selected.forEach((file) => {
+      if (file.type.startsWith("image/")) {
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error(`${file.name} exceeds 5MB limit`);
+          return;
+        }
+        accepted.push(file);
+      } else if (DOCUMENT_TYPES.includes(file.type) || /\.pdf$|\.docx?$/.test(file.name.toLowerCase())) {
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error(`${file.name} exceeds 10MB limit`);
+          return;
+        }
+        accepted.push(file);
+      } else {
+        toast.error(`${file.name} is not a supported file type`);
+      }
+    });
+
+    if (accepted.length === 0) return;
+
+    setFiles((prev) => {
+      const next = [...prev, ...accepted];
+      return next;
+    });
+
+    // reset input so selecting same files again works
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleRemoveDocument = () => {
-    setDocument(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+  React.useEffect(() => {
+    // regenerate previews array aligned with files array
+    setImagePreviews((prev) => {
+      const arr: (string | null)[] = Array(files.length).fill(null);
+      return arr;
+    });
+
+    files.forEach((file, index) => {
+      if (!file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setImagePreviews((prev) => {
+          const copy = [...prev];
+          copy[index] = ev.target?.result as string;
+          return copy;
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }, [files]);
+
+  const handleRemoveFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
@@ -91,26 +127,31 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
       toast.error("Please enter an opportunity description");
       return;
     }
-    if (!document) {
-      toast.error("Please upload a document");
+    // require at least one document file
+    const documentFile = files.find((f) => DOCUMENT_TYPES.includes(f.type) || /\.pdf$|\.docx?$/.test(f.name.toLowerCase()));
+    if (!documentFile) {
+      toast.error("Please include at least one PDF or Word document");
       return;
     }
-    
+
+    const imagesFiles = files.filter((f) => f.type.startsWith("image/"));
+
     await onSubmit({
       ...formData,
-      document,
+      document: documentFile,
+      images: imagesFiles.length > 0 ? imagesFiles : undefined,
     });
+
     setFormData({ roomName: "", roomDescription: "" });
-    setDocument(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setFiles([]);
+    setImagePreviews([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Opportunity</DialogTitle>
           <DialogDescription>
@@ -146,15 +187,17 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
             />
           </div>
 
+          {/* Files upload (documents + images) */}
           <div className="space-y-2">
-            <Label htmlFor="document">Upload Document</Label>
+            <Label htmlFor="files">Upload Files <span className="text-destructive">*</span></Label>
             <div className="relative">
               <input
                 ref={fileInputRef}
-                id="document"
+                id="files"
                 type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={handleFileSelect}
+                accept=".pdf,.doc,.docx,image/*"
+                multiple
+                onChange={handleFilesSelect}
                 disabled={isLoading}
                 className="hidden"
               />
@@ -165,30 +208,37 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
               >
                 <Upload className="h-4 w-4" />
                 <span className="text-sm text-muted-foreground">
-                  Click to upload or drag and drop
+                  Click to upload files (documents & images) or drag and drop
                 </span>
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              PDF or Word document (max 10MB) - Required
-            </p>
+           
 
-            {document && (
-              <div className="flex items-center justify-between bg-secondary p-3 rounded">
-                <div className="flex items-center gap-2 min-w-0">
-                  <File className="h-4 w-4 flex-shrink-0" />
-                  <span className="text-sm truncate">{document.name}</span>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    ({(document.size / 1024 / 1024).toFixed(2)}MB)
-                  </span>
-                </div>
-                <button
-                  onClick={handleRemoveDocument}
-                  disabled={isLoading}
-                  className="text-destructive hover:text-destructive/80 flex-shrink-0"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+            {files.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                {files.map((f, idx) => (
+                  <div key={idx} className="relative rounded-lg overflow-hidden border border-muted-foreground/20 p-2 bg-secondary">
+                    {imagePreviews[idx] ? (
+                      <img src={imagePreviews[idx] || undefined} alt={f.name} className="w-full h-28 object-cover rounded" />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <File className="h-5 w-5" />
+                        <div className="min-w-0">
+                          <div className="text-sm truncate">{f.name}</div>
+                          <div className="text-xs text-muted-foreground">{(f.size / 1024 / 1024).toFixed(2)}MB</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => handleRemoveFile(idx)}
+                      disabled={isLoading}
+                      className="absolute top-2 right-2 bg-black/50 rounded p-1"
+                    >
+                      <X className="h-4 w-4 text-white" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

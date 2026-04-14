@@ -90,6 +90,7 @@ export const apiDealRooms = {
     roomDescription: string;
     members?: string[];
     document: File;
+    images?: File[];
   }): Promise<DealRoom> {
     const token = localStorage.getItem("stp_token");
     
@@ -111,6 +112,13 @@ export const apiDealRooms = {
     // Add document if provided
     if (roomData.document) {
       formData.append("document", roomData.document);
+    }
+
+    // Add images if provided
+    if (roomData.images && roomData.images.length > 0) {
+      roomData.images.forEach((image, index) => {
+        formData.append(`images`, image);
+      });
     }
 
     const response = await fetch(`${API_BASE_URL}/dealrooms`, {
