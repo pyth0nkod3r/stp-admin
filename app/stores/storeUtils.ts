@@ -5,7 +5,8 @@ import { usePostsStore } from './postsStore';
 import { useUsersStore } from './usersStore';
 import { useOpportunitiesStore } from './opportunitiesStore';
 import { showNotification } from './uiStore';
-import type { Post, User, Opportunity, ApiResponse } from './types';
+import type { Post, Opportunity, ApiResponse } from './types';
+import type { User } from '@/lib/type';
 
 /**
  * Initialize auth from localStorage

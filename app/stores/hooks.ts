@@ -5,7 +5,8 @@ import { useUsersStore } from './usersStore';
 import { useOpportunitiesStore } from './opportunitiesStore';
 import { useUIStore, showNotification } from './uiStore';
 import { fetchWithStore } from './storeUtils';
-import type { Post, User, Opportunity, ApiResponse } from './types';
+import type { Post, Opportunity, ApiResponse } from './types';
+import type { User } from '@/lib/type';
 
 /**
  * Hook: Fetch posts and populate store

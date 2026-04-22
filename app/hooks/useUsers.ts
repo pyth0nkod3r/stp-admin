@@ -1,6 +1,7 @@
-import { fetchUsers, fetchUserProfile } from "@/services/apiUsers";
+import { fetchUsers, fetchUserProfile, fetchUsersSummary } from "@/services/apiUsers";
 import { useUsersStore } from "@/stores/usersStore";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 export function useUsers(page: number = 1, perPage: number = 10) {
   const users = useUsersStore((state) => state.users);
@@ -128,5 +129,23 @@ export function useUserProfile(userId: string | null) {
     profile,
     isLoading,
     error,
+  };
+}
+
+export function useUsersSummary() {
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("stp_token");
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["users-summary"],
+    queryFn: fetchUsersSummary,
+    enabled: hasToken,
+    staleTime: 60 * 1000,
+  });
+
+  return {
+    summary: data?.data ?? null,
+    isLoading,
+    error: error instanceof Error ? error.message : null,
+    refetch,
   };
 }

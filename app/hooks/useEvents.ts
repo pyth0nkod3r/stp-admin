@@ -1,65 +1,52 @@
-import { fetchEvents, fetchPendingEvents } from "@/services/apiEvents";
-import { useEventsStore } from "@/stores/eventsStore";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchEvents, fetchPendingEvents, type BackofficeEvent } from "@/services/apiEvents";
+
+interface EventsQueryResult {
+  events: BackofficeEvent[];
+  approvedEvents: BackofficeEvent[];
+  pendingEvents: BackofficeEvent[];
+}
 
 export function useEvents() {
-  const events = useEventsStore((state) => state.events);
-  const approvedEvents = useEventsStore((state) => state.approvedEvents);
-  const pendingEvents = useEventsStore((state) => state.pendingEvents);
-  const isLoading = useEventsStore((state) => state.isLoading);
-  const error = useEventsStore((state) => state.error);
-  const setApprovedEvents = useEventsStore((state) => state.setApprovedEvents);
-  const setPendingEvents = useEventsStore((state) => state.setPendingEvents);
-  const setEvents = useEventsStore((state) => state.setEvents);
-  const setIsLoading = useEventsStore((state) => state.setIsLoading);
-  const setError = useEventsStore((state) => state.setError);
-  
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("stp_token");
 
-  useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
-    setIsAuthenticated(!!token);
-  }, []);
+  const { data, isLoading, error } = useQuery<EventsQueryResult>({
+    queryKey: ["events"],
+    enabled: hasToken,
+    queryFn: async () => {
+      const [allRes, pendingRes] = await Promise.all([
+        fetchEvents("ALL"),
+        fetchPendingEvents(),
+      ]);
 
-  useEffect(() => {
-    if (!isAuthenticated || hasInitialized) return;
+      const merged = new Map<string, BackofficeEvent>();
 
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
+      allRes.data.forEach((event) => {
+        merged.set(event.eventId, event);
+      });
 
-      try {
-        const [approvedRes, pendingRes] = await Promise.all([
-          fetchEvents(),
-          fetchPendingEvents(),
-        ]);
+      pendingRes.data.forEach((event) => {
+        merged.set(event.eventId, { ...event, eventStatus: "pending" });
+      });
 
-        setApprovedEvents(approvedRes.data);
-        setPendingEvents(pendingRes.data);
+      const events = Array.from(merged.values()).sort(
+        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
 
-        const allEvents = [
-          ...approvedRes.data,
-          ...pendingRes.data,
-        ];
-        allEvents.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-        setEvents(allEvents);
-      } catch (error: any) {
-        setError(error?.message || "Failed to fetch events");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-    setHasInitialized(true);
-  }, [isAuthenticated, hasInitialized]);
+      return {
+        events,
+        approvedEvents: events.filter((event) => event.eventStatus === "approved"),
+        pendingEvents: events.filter((event) => event.eventStatus === "pending"),
+      };
+    },
+    staleTime: 30 * 1000,
+  });
 
   return {
-    events,
-    approvedEvents,
-    pendingEvents,
+    events: data?.events ?? [],
+    approvedEvents: data?.approvedEvents ?? [],
+    pendingEvents: data?.pendingEvents ?? [],
     isLoading,
-    error,
+    error: error instanceof Error ? error.message : null,
   };
 }

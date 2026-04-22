@@ -1,9 +1,32 @@
-import { API_BASE_URL } from "./config";
-
+import { apiRequest, type ApiEnvelope } from "./apiClient";
+import { API_ENDPOINTS } from "./endpoints";
 
 export interface LoginPayload {
   emailAddress: string;
   password: string;
+}
+
+export interface RegisterPayload {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  emailAddress?: string;
+  password: string;
+}
+
+export interface ForgotPasswordPayload {
+  email?: string;
+  emailAddress?: string;
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  password: string;
+  confirmPassword?: string;
+}
+
+export interface VerifyResetTokenPayload {
+  token: string;
 }
 
 export interface LoginData {
@@ -18,41 +41,69 @@ export interface LoginData {
   passwordChangeRequired: boolean;
 }
 
-export interface LoginResponse {
-  status: boolean;
-  message: string;
-  data: LoginData;
+export type AuthActionResponse = ApiEnvelope<Record<string, unknown> | null>;
+export type LoginResponse = ApiEnvelope<LoginData>;
+
+function mapEmail(email?: string, emailAddress?: string): string {
+  return (email ?? emailAddress ?? "").trim();
 }
 
-
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      redirect: "follow",
-    });
+  const result = await apiRequest<LoginResponse>(API_ENDPOINTS.auth.login, {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify(payload),
+  });
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => null);
-      throw new Error(err?.message || "Login failed");
-    }
-
-    const result: LoginResponse = await response.json();
-
-    // Save token in localStorage
-    if (result?.data?.token) {
-      localStorage.setItem("stp_token", result.data.token);
-      localStorage.setItem("stp_user_name", result.data.name);
-      localStorage.setItem("stp_user_email", result.data.email);
-    }
-
-    return result;
-  } catch (error: any) {
-    console.error("Login Error:", error);
-    throw new Error(error?.message || "Unable to login");
+  if (result?.data?.token) {
+    localStorage.setItem("stp_token", result.data.token);
+    localStorage.setItem("stp_user_name", result.data.name);
+    localStorage.setItem("stp_user_email", result.data.email);
+    localStorage.setItem("stp_user_role", result.data.role);
   }
+
+  return result;
+}
+
+export async function register(payload: RegisterPayload): Promise<AuthActionResponse> {
+  return apiRequest<AuthActionResponse>(API_ENDPOINTS.auth.register, {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify({
+      ...payload,
+      email: mapEmail(payload.email, payload.emailAddress),
+    }),
+  });
+}
+
+export async function forgotPassword(
+  payload: ForgotPasswordPayload
+): Promise<AuthActionResponse> {
+  return apiRequest<AuthActionResponse>(API_ENDPOINTS.auth.forgotPassword, {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify({
+      email: mapEmail(payload.email, payload.emailAddress),
+    }),
+  });
+}
+
+export async function resetPassword(
+  payload: ResetPasswordPayload
+): Promise<AuthActionResponse> {
+  return apiRequest<AuthActionResponse>(API_ENDPOINTS.auth.resetPassword, {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyResetToken(
+  payload: VerifyResetTokenPayload
+): Promise<AuthActionResponse> {
+  return apiRequest<AuthActionResponse>(API_ENDPOINTS.auth.verifyResetToken, {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify(payload),
+  });
 }

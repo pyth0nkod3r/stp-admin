@@ -56,6 +56,7 @@ export interface Event {
   eventId: string;
   type: string;
   format: string;
+  eventStatus?: "approved" | "pending" | "rejected";
   name: string;
   timeZone: string;
   startTime: string;

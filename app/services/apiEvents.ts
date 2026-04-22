@@ -1,85 +1,19 @@
 import type { Event } from "@/lib/type";
-import { API_BASE_URL } from "./config";
-import { clearAuthAndRedirect } from "./authUtils";
+import { apiRequest } from "./apiClient";
+import { API_ENDPOINTS } from "./endpoints";
+
+export type EventStatusFilter = "ALL" | "ACTIVE" | "PENDING_APPROVAL" | "REJECTED";
+export type EventModerationAction = "approve" | "reject";
+
+export interface BackofficeEvent extends Event {
+  eventStatus: "approved" | "pending" | "rejected";
+}
 
 export interface EventsResponse {
   status: boolean;
   message: string;
-  data: Event[];
+  data: BackofficeEvent[];
 }
-
-export async function fetchEvents(): Promise<EventsResponse> {
-  // Mock implementation - instant response for better UX
-  return {
-    status: true,
-    message: "Events fetched successfully",
-    data: [
-      {
-        eventId: "1",
-        type: "online",
-        format: "webinar",
-        name: "Alumni Networking Session",
-        timeZone: "UTC",
-        startTime: "2026-05-15T14:00:00Z",
-        endTime: "2026-05-15T16:00:00Z",
-        description: "Monthly alumni networking session",
-        externalLink: "https://zoom.us/j/example",
-        address: "",
-        venue: "",
-        createdBy: "admin",
-        createdAt: "2026-04-01T10:00:00Z",
-        updatedAt: "2026-04-01T10:00:00Z",
-        coverImageUrl: "",
-      },
-      {
-        eventId: "2",
-        type: "physical",
-        format: "conference",
-        name: "Tech Career Fair 2026",
-        timeZone: "UTC",
-        startTime: "2026-06-20T09:00:00Z",
-        endTime: "2026-06-20T17:00:00Z",
-        description: "Annual tech career fair for alumni",
-        externalLink: "",
-        address: "123 University Ave, City, State",
-        venue: "Main Campus Center",
-        createdBy: "admin",
-        createdAt: "2026-04-05T10:00:00Z",
-        updatedAt: "2026-04-05T10:00:00Z",
-        coverImageUrl: "",
-      },
-    ],
-  };
-}
-
-export async function fetchPendingEvents(): Promise<EventsResponse> {
-  // Mock implementation - instant response for better UX
-  return {
-    status: true,
-    message: "Pending events fetched successfully",
-    data: [
-      {
-        eventId: "3",
-        type: "online",
-        format: "workshop",
-        name: "Resume Review Workshop",
-        timeZone: "UTC",
-        startTime: "2026-04-25T15:00:00Z",
-        endTime: "2026-04-25T16:30:00Z",
-        description: "Get your resume reviewed by industry experts",
-        externalLink: "https://zoom.us/j/workshop",
-        address: "",
-        venue: "",
-        createdBy: "user123",
-        createdAt: "2026-04-08T10:00:00Z",
-        updatedAt: "2026-04-08T10:00:00Z",
-        coverImageUrl: "",
-      },
-    ],
-  };
-}
-
-
 
 export interface CreateEventPayload {
   type: string;
@@ -105,52 +39,129 @@ export interface CreateEventResponse {
 export interface EventDetailResponse {
   status: boolean;
   message: string;
-  data: Event;
+  data: BackofficeEvent;
 }
 
-export async function fetchEventById(
-  eventId: string
-): Promise<EventDetailResponse> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
+export interface ApproveEventPayload {
+  action: EventModerationAction;
+  reason?: string;
+}
 
-  const mockEvent = {
-    eventId,
-    type: "online",
-    format: "webinar",
-    name: "Mock Event Details",
-    timeZone: "UTC",
-    startTime: "2026-05-15T14:00:00Z",
-    endTime: "2026-05-15T16:00:00Z",
-    description: "This is a mock event for testing purposes",
-    externalLink: "https://zoom.us/j/mock",
-    address: "",
-    venue: "",
-    createdBy: "admin",
-    createdAt: "2026-04-01T10:00:00Z",
-    updatedAt: "2026-04-01T10:00:00Z",
-    coverImageUrl: "",
+function normalizeEventStatus(rawStatus: unknown): BackofficeEvent["eventStatus"] {
+  const status = String(rawStatus ?? "").toUpperCase();
+  if (status.includes("PENDING")) return "pending";
+  if (status.includes("REJECT")) return "rejected";
+  if (status.includes("APPROVE") || status.includes("ACTIVE")) return "approved";
+  return "approved";
+}
+
+function normalizeEvent(event: any, fallbackStatus?: unknown): BackofficeEvent {
+  return {
+    eventId: event?.eventId ?? event?.id ?? "",
+    type: String(event?.type ?? "online").toLowerCase(),
+    format: event?.format ?? "",
+    name: event?.name ?? "",
+    timeZone: event?.timeZone ?? "UTC",
+    startTime: event?.startTime ?? event?.startDateTime ?? "",
+    endTime: event?.endTime ?? event?.endDateTime ?? event?.startTime ?? "",
+    description: event?.description ?? "",
+    externalLink: event?.externalLink ?? "",
+    address: event?.address ?? "",
+    venue: event?.venue ?? "",
+    createdBy: event?.createdBy ?? "",
+    createdAt: event?.createdAt ?? "",
+    updatedAt: event?.updatedAt ?? "",
+    coverImageUrl: event?.coverImageUrl ?? event?.coverImagePath ?? "",
+    eventStatus: normalizeEventStatus(event?.eventStatus ?? event?.status ?? fallbackStatus),
   };
+}
+
+function extractRows(result: any): any[] {
+  if (Array.isArray(result?.data)) return result.data;
+  if (Array.isArray(result)) return result;
+  return [];
+}
+
+export async function fetchEvents(status: EventStatusFilter = "ALL"): Promise<EventsResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.events, {
+    method: "GET",
+    query: { status },
+  });
 
   return {
-    status: true,
-    message: "Event details fetched successfully",
-    data: mockEvent,
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Events fetched successfully",
+    data: extractRows(result).map((event) => normalizeEvent(event, status)),
+  };
+}
+
+export async function fetchPendingEvents(): Promise<EventsResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.pendingEvents, {
+    method: "GET",
+  });
+
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Pending events fetched successfully",
+    data: extractRows(result).map((event) => normalizeEvent(event, "PENDING_APPROVAL")),
+  };
+}
+
+export async function fetchEventById(eventId: string): Promise<EventDetailResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.events.byId(eventId), {
+    method: "GET",
+  });
+
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Event details fetched successfully",
+    data: normalizeEvent(result?.data ?? result),
   };
 }
 
 export async function createEvent(
   payload: CreateEventPayload
 ): Promise<CreateEventResponse> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 500));
-  console.log(`Mock: Created event: ${payload.name}`);
+  const formData = new FormData();
+  formData.append("type", payload.type);
+  formData.append("name", payload.name);
+  formData.append("timeZone", payload.timeZone);
+  formData.append("startTime", payload.startTime);
+  formData.append("endTime", payload.endTime);
+  formData.append("description", payload.description);
+  formData.append("externalLink", payload.externalLink);
+  formData.append("address", payload.address);
+  formData.append("venue", payload.venue);
+  if (payload.coverImage) {
+    formData.append("coverImage", payload.coverImage);
+  }
+
+  const result = await apiRequest<any>(API_ENDPOINTS.events.create, {
+    method: "POST",
+    body: formData,
+  });
 
   return {
-    status: true,
-    message: "Event created successfully",
-    data: {
-      eventId: `mock-event-${Date.now()}`,
-    },
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Event created successfully",
+    data: result?.data ?? { eventId: "" },
   };
+}
+
+export async function moderateEvent(
+  eventId: string,
+  payload: ApproveEventPayload
+): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.approveEvent(eventId), {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function approveEvent(eventId: string): Promise<void> {
+  await moderateEvent(eventId, { action: "approve" });
+}
+
+export async function declineEvent(eventId: string, reason?: string): Promise<void> {
+  await moderateEvent(eventId, { action: "reject", reason });
 }

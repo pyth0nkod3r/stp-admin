@@ -57,7 +57,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useUsers, useAllUsers, useUserProfile } from "@/hooks/useUsers";
+import { useUsers, useAllUsers, useUserProfile, useUsersSummary } from "@/hooks/useUsers";
 import {
   useCreateUserMutation,
   useVerifyUserMutation,
@@ -115,10 +115,13 @@ export default function UserDirectoryPage() {
 
   // Fetch all users for stat counts (independent of pagination)
   const { data: allUsersResponse, isLoading: allUsersLoading } = useAllUsers();
+  const { summary: usersSummary } = useUsersSummary();
   const allUsers = allUsersResponse?.data ?? [];
-  const totalCount = allUsers.length;
-  const verifiedCount = allUsers.filter((u: User) => u.isVerified).length;
-  const pendingCount = allUsers.filter((u: User) => !u.isVerified).length;
+  const totalCount = usersSummary?.totalUsers ?? allUsers.length;
+  const verifiedCount =
+    usersSummary?.verifiedUsers ?? allUsers.filter((u: User) => u.isVerified).length;
+  const pendingCount =
+    usersSummary?.pendingUsers ?? allUsers.filter((u: User) => !u.isVerified).length;
 
   // When filtering/searching, apply across all users (not just the current page)
   const isFiltering = statusFilter !== "ALL" || searchTerm !== "";

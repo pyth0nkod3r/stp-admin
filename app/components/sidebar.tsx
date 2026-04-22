@@ -2,15 +2,12 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
-  GraduationCap,
-  DollarSign,
-  MessageSquare,
   Megaphone,
   Settings,
   ShieldCheck,
-  UserCircle,
   LogOut,
-  Contact,
+  UserPlus,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -30,12 +27,26 @@ import { useLocation } from "react-router";
 import { NavLink } from "./nav-link";
 import { toast } from "sonner";
 
-const mainItems = [
+type SidebarItem = {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  roles?: string[];
+};
+
+const mainItems: SidebarItem[] = [
   { title: "Overview", url: "/admin/dashboard", icon: LayoutDashboard },
   { title: "User Directory", url: "/admin/users", icon: Users },
+  { title: "Groups", url: "/admin/groups", icon: ShieldCheck },
   // { title: "Verification Queue", url: "/admin/verification", icon: ShieldCheck }, // NOTE: No longer needed
   { title: "Opportunities", url: "/admin/opportunities", icon: Briefcase },
   { title: "Content & Engagement", url: "/admin/content", icon: Megaphone },
+  {
+    title: "Register Admin",
+    url: "/admin/register-admin",
+    icon: UserPlus,
+    roles: ["BACKOFFICE", "ADMIN"],
+  },
   { title: "System & Management", url: "/admin/system", icon: Settings },
   // { title: "Contacts", url: "/admin/contacts", icon: Contact },
 ];
@@ -47,6 +58,7 @@ export function AppSidebar() {
 
   const userName = localStorage.getItem("stp_user_name") || "Admin";
   const userEmail = localStorage.getItem("stp_user_email") || "";
+  const userRole = localStorage.getItem("stp_user_role") || "";
   const initials = userName
     .split(" ")
     .map((n) => n[0])
@@ -63,6 +75,7 @@ export function AppSidebar() {
     localStorage.removeItem("stp_token");
     localStorage.removeItem("stp_user_name");
     localStorage.removeItem("stp_user_email");
+    localStorage.removeItem("stp_user_role");
     toast.success("Logged out successfully");
     window.location.replace("/login");
   }
@@ -89,6 +102,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
+                item.roles && userRole && !item.roles.includes(userRole) ? null : (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink
@@ -101,6 +115,7 @@ export function AppSidebar() {
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                )
               ))}
             </SidebarMenu>
           </SidebarGroupContent>

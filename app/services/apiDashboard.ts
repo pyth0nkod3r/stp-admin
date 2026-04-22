@@ -1,13 +1,16 @@
-import { API_BASE_URL } from "./config";
-import { clearAuthAndRedirect } from "./authUtils";
+import { apiRequest } from "./apiClient";
+import { API_ENDPOINTS } from "./endpoints";
 
 export interface DashboardSummary {
   totalUsers: number;
+  verifiedUsers: number;
+  pendingUsers: number;
   activeUsers: number;
   pendingGroups: number;
   pendingEvents: number;
   totalGroups: number;
   totalEvents: number;
+  alumniConnections: number;
 }
 
 export interface DashboardResponse {
@@ -16,26 +19,37 @@ export interface DashboardResponse {
   data: DashboardSummary;
 }
 
-export async function fetchDashboardSummary(): Promise<DashboardResponse> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
+function asNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
-  const response = await fetch(`${API_BASE_URL}/backoffice/dashboard`, {
+function normalizeDashboardSummary(payload: any): DashboardSummary {
+  const summary = payload?.summary ?? payload ?? {};
+
+  return {
+    totalUsers: asNumber(summary.totalUsers ?? summary.total),
+    verifiedUsers: asNumber(summary.verifiedUsers ?? summary.verified),
+    pendingUsers: asNumber(summary.pendingUsers ?? summary.pending),
+    activeUsers: asNumber(summary.activeUsers ?? summary.active),
+    pendingGroups: asNumber(payload?.pendingGroups ?? summary.pendingGroups),
+    pendingEvents: asNumber(payload?.pendingEvents ?? summary.pendingEvents),
+    totalGroups: asNumber(summary.totalGroups ?? payload?.totalGroups),
+    totalEvents: asNumber(summary.totalEvents ?? payload?.totalEvents),
+    alumniConnections: asNumber(
+      payload?.alumniConnections ?? summary.alumniConnections
+    ),
+  };
+}
+
+export async function fetchDashboardSummary(): Promise<DashboardResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.dashboard, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    redirect: "follow",
   });
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to fetch dashboard summary");
-  }
-
-  return response.json();
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Dashboard summary fetched successfully",
+    data: normalizeDashboardSummary(result?.data ?? result),
+  };
 }

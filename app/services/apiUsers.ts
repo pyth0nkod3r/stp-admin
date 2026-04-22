@@ -1,6 +1,6 @@
 import type { User } from "@/lib/type";
-import { API_BASE_URL } from "./config";
-import { clearAuthAndRedirect } from "./authUtils";
+import { apiRequest } from "./apiClient";
+import { API_ENDPOINTS } from "./endpoints";
 
 export interface UsersResponse {
   status: boolean;
@@ -8,249 +8,33 @@ export interface UsersResponse {
   data: User[];
 }
 
-export async function fetchUsers(
-  page: number = 1,
-  perPage: number = 10
-): Promise<UsersResponse> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
+export interface UsersSummary {
+  totalUsers: number;
+  verifiedUsers: number;
+  pendingUsers: number;
+  activeUsers: number;
+}
 
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users?page=${page}&perPage=${perPage}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
+export interface UsersSummaryResponse {
+  status: boolean;
+  message: string;
+  data: UsersSummary;
+}
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to fetch users");
-  }
-
-  const data: UsersResponse = await response.json();
-  return data;
+export interface FetchUsersParams {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  isVerified?: boolean;
+  isActive?: boolean;
 }
 
 export interface CreateUserPayload {
   firstName: string;
   lastName: string;
-  emailAddress: string;
-}
-
-export async function verifyUser(userId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}/verify`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to verify user");
-  }
-}
-
-export async function createUser(payload: CreateUserPayload): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(`${API_BASE_URL}/backoffice/users/onboard`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to create user");
-  }
-}
-
-export async function deleteUser(userId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to delete user");
-  }
-}
-
-export async function activateUser(userId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}/activate`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to activate user");
-  }
-}
-
-export async function deactivateUser(userId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}/deactivate`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to deactivate user");
-  }
-}
-
-export async function lockUser(userId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}/lock`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to lock user");
-  }
-}
-
-export async function unlockUser(userId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}/unlock`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to unlock user");
-  }
-}
-
-export async function changeUserRole(userId: string, role: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}/role`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ role }),
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to change user role");
-  }
+  email?: string;
+  emailAddress?: string;
+  cohort?: string;
 }
 
 export interface UserProfileResponse {
@@ -290,374 +74,138 @@ export interface UserProfileResponse {
   };
 }
 
+function asNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeUsersSummary(payload: any): UsersSummary {
+  const summary = payload?.summary ?? payload ?? {};
+
+  const totalUsers = asNumber(summary.totalUsers ?? summary.total);
+  const verifiedUsers = asNumber(summary.verifiedUsers ?? summary.verified);
+  const pendingUsers = asNumber(summary.pendingUsers ?? summary.pending);
+  const activeUsers = asNumber(summary.activeUsers ?? summary.active);
+
+  return {
+    totalUsers,
+    verifiedUsers,
+    pendingUsers: pendingUsers || Math.max(totalUsers - verifiedUsers, 0),
+    activeUsers,
+  };
+}
+
+export async function fetchUsers(
+  page = 1,
+  perPage = 10
+): Promise<UsersResponse> {
+  return fetchUsersByParams({ page, perPage });
+}
+
+export async function fetchUsersByParams(
+  params: FetchUsersParams = {}
+): Promise<UsersResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.users, {
+    method: "GET",
+    query: {
+      page: params.page ?? 1,
+      perPage: params.perPage ?? 10,
+      search: params.search,
+      isVerified:
+        params.isVerified === undefined ? undefined : Number(params.isVerified),
+      isActive: params.isActive === undefined ? undefined : Number(params.isActive),
+    },
+  });
+
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Users fetched successfully",
+    data: Array.isArray(result?.data) ? result.data : [],
+  };
+}
+
+export async function fetchUsersSummary(): Promise<UsersSummaryResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.usersSummary, {
+    method: "GET",
+  });
+
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Users summary fetched successfully",
+    data: normalizeUsersSummary(result?.data ?? result),
+  };
+}
+
+export async function verifyUser(userId: string): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.verifyUser(userId), {
+    method: "PUT",
+  });
+}
+
+export async function createUser(payload: CreateUserPayload): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.onboardUser, {
+    method: "POST",
+    body: JSON.stringify({
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      email: payload.email ?? payload.emailAddress ?? "",
+      cohort: payload.cohort ?? "",
+    }),
+  });
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.userById(userId), {
+    method: "DELETE",
+  });
+}
+
+export async function activateUser(userId: string): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.activateUser(userId), {
+    method: "PUT",
+  });
+}
+
+export async function deactivateUser(userId: string): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.deactivateUser(userId), {
+    method: "PUT",
+  });
+}
+
+export async function lockUser(userId: string): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.lockUser(userId), {
+    method: "PUT",
+  });
+}
+
+export async function unlockUser(userId: string): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.unlockUser(userId), {
+    method: "PUT",
+  });
+}
+
+export async function changeUserRole(userId: string, role: string): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.changeUserRole(userId), {
+    method: "PUT",
+    body: JSON.stringify({ role }),
+  });
+}
+
 export async function fetchUserProfile(userId: string): Promise<UserProfileResponse> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.userById(userId), {
+    method: "GET",
+  });
 
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to fetch user profile");
-  }
-
-  const data: UserProfileResponse = await response.json();
-  return data;
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "User profile fetched successfully",
+    data: result?.data ?? result,
+  };
 }
 
 export async function rejectUserVerification(userId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/users/${userId}/approve`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ action: "reject" }),
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to reject user");
-  }
-}
-
-// Content Management APIs
-export interface FeedPost {
-  id: string;
-  user: string;
-  content: string;
-  status: 'pending' | 'approved' | 'flagged' | 'rejected';
-  time: string;
-}
-
-export async function getPendingPosts(): Promise<FeedPost[]> {
-  // Mock implementation - instant response for better UX
-  return [
-    {
-      id: '1',
-      user: 'David K.',
-      content: 'Just landed a role at Google! Thanks to the STP network for the prep...',
-      status: 'pending',
-      time: '1h ago',
-    },
-    {
-      user: 'Linda M.',
-      content: 'Anyone interested in a weekend hackathon for Fintech? Looking for partners.',
-      status: 'flagged',
-      time: '3h ago',
-      id: '2',
-    },
-  ];
-}
-
-export async function approvePost(postId: string): Promise<void> {
-  // Mock implementation
-  console.log(`Mock: Approved post with ID: ${postId}`);
-}
-
-export async function rejectPost(postId: string): Promise<void> {
-  // Mock implementation
-  console.log(`Mock: Rejected post with ID: ${postId}`);
-}
-
-export interface NewsItem {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  publishedAt: string;
-  views: number;
-  status: 'draft' | 'published';
-}
-
-export interface CreateNewsPayload {
-  title: string;
-  body: string;
-  category: string;
-  postImages?: File[];
-}
-
-export async function createNews(payload: CreateNewsPayload): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const formData = new FormData();
-  formData.append("title", payload.title);
-  formData.append("body", payload.body);
-  formData.append("category", payload.category);
-  if (payload.postImages && payload.postImages.length > 0) {
-    payload.postImages.forEach((image, index) => {
-      formData.append("postImages", image);
-    });
-  }
-
-  const response = await fetch(`${API_BASE_URL}/posts`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to create news");
-  }
-}
-
-export interface UpdateNewsPayload {
-  title: string;
-  body: string;
-  category: string;
-  postImages?: File[];
-}
-
-export async function updateNews(postId: string, payload: UpdateNewsPayload): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const formData = new FormData();
-  formData.append("title", payload.title);
-  formData.append("body", payload.body);
-  formData.append("category", payload.category);
-  if (payload.postImages && payload.postImages.length > 0) {
-    payload.postImages.forEach((image) => {
-      formData.append("postImages", image);
-    });
-  }
-
-  const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
+  await apiRequest(API_ENDPOINTS.backoffice.rejectUser(userId), {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
+    body: JSON.stringify({ action: "reject" }),
   });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to update news");
-  }
-}
-
-export async function deleteNews(postId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to delete news");
-  }
-}
-
-export async function getNews(): Promise<NewsItem[]> {
-  // Mock implementation - instant response for better UX
-  return [
-    {
-      id: '1',
-      title: 'Annual Alumni Gala 2026',
-      content: 'Join us for the annual alumni gala...',
-      category: 'announcement',
-      publishedAt: '2026-02-15',
-      views: 1200,
-      status: 'published',
-    },
-    {
-      id: '2',
-      title: 'New Resource: Career Transition Guide',
-      content: 'We\'ve published a comprehensive guide...',
-      category: 'achievement',
-      publishedAt: '2026-01-28',
-      views: 850,
-      status: 'published',
-    },
-    {
-      id: '3',
-      title: 'Campus Development Update',
-      content: 'Exciting updates on campus development...',
-      category: 'press',
-      publishedAt: '2026-01-12',
-      views: 430,
-      status: 'published',
-    },
-  ];
-}
-
-export async function approveEvent(eventId: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Approved event with ID: ${eventId}`);
-}
-
-export async function declineEvent(eventId: string): Promise<void> {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 300));
-  console.log(`Mock: Declined event with ID: ${eventId}`);
-}
-
-export interface Resource {
-  id: string; // resourceId
-  name: string; // title
-  description?: string;
-  category: string;
-  filePath?: string; // resourceFilePath
-  createdAt?: string;
-  uploaderFirstName?: string | null;
-  uploaderLastName?: string | null;
-  uploaderEmail?: string | null;
-  visibility: string; // 'All' | 'Verified' etc.
-  downloads: string; // display string
-  status: 'active' | 'archived';
-}
-
-export async function getResources(
-  opts: { page?: number; limit?: number; sortBy?: string } = { page: 1, limit: 20, sortBy: 'newest' }
-): Promise<Resource[]> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const page = opts.page ?? 1;
-  const limit = opts.limit ?? 20;
-  const sortBy = opts.sortBy ?? 'newest';
-
-  const url = `${API_BASE_URL}/backoffice/content/resources?page=${page}&limit=${limit}&sortBy=${encodeURIComponent(
-    sortBy
-  )}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to fetch resources");
-  }
-
-  const payload = await response.json().catch(() => null);
-  if (!payload) return [];
-
-  const dataArray = Array.isArray(payload) ? payload : Array.isArray(payload.data) ? payload.data : [];
-
-  return dataArray.map((r: any) => ({
-    id: r.resourceId || r.id || "",
-    name: r.title || r.name || "",
-    description: r.description || "",
-    category: r.category || "",
-    filePath: r.resourceFilePath || r.filePath || "",
-    createdAt: r.createdAt || r.created_at || "",
-    uploaderFirstName: r.firstName ?? null,
-    uploaderLastName: r.lastName ?? null,
-    uploaderEmail: r.email ?? null,
-    // derive visibility: if uploader email present assume Verified, else All
-    visibility: r.visibility || (r.email ? "Verified" : "All"),
-    downloads: r.downloads ? String(r.downloads) : "—",
-    status: r.status === "archived" ? "archived" : "active",
-  } as Resource));
-}
-
-export async function archiveResource(resourceId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/content/resources/${resourceId}/archive`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to archive resource");
-  }
-}
-
-export async function deleteResource(resourceId: string): Promise<void> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const response = await fetch(
-    `${API_BASE_URL}/backoffice/content/resources/${resourceId}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Session expired");
-    }
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to delete resource");
-  }
 }

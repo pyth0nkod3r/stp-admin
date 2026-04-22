@@ -62,7 +62,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { createEvent } from "@/services/apiEvents";
+import { createEvent, approveEvent, declineEvent } from "@/services/apiEvents";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useEvents } from "@/hooks/useEvents";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -70,21 +70,21 @@ import {
   getPendingPosts,
   approvePost,
   rejectPost,
-  createNews,
-  updateNews,
-  deleteNews,
-  getNews,
-  approveEvent,
-  declineEvent,
   getResources,
   archiveResource,
   deleteResource,
   type FeedPost,
-  type NewsItem,
-  type CreateNewsPayload,
-  type UpdateNewsPayload,
   type Resource,
-} from "@/services/apiUsers";
+} from "@/services/apiContent";
+import {
+  createNewsfeed as createNews,
+  updateNewsfeed as updateNews,
+  deleteNewsfeed as deleteNews,
+  getNewsfeed as getNews,
+  type NewsfeedPost as NewsItem,
+  type CreateNewsfeedPayload as CreateNewsPayload,
+  type UpdateNewsfeedPayload as UpdateNewsPayload,
+} from "@/services/apiNewsfeed";
 
 export default function ContentEngagementPage() {
   const { events, isLoading: eventsLoading } = useEvents();
@@ -93,7 +93,7 @@ export default function ContentEngagementPage() {
   // Fetch pending posts
   const { data: pendingPosts = [], isLoading: postsLoading } = useQuery({
     queryKey: ['pending-posts'],
-    queryFn: getPendingPosts,
+    queryFn: () => getPendingPosts(),
   });
 
   // Fetch news
@@ -105,7 +105,7 @@ export default function ContentEngagementPage() {
   // Fetch resources
   const { data: resources = [], isLoading: resourcesLoading } = useQuery({
     queryKey: ['resources'],
-    queryFn: getResources,
+    queryFn: () => getResources(),
   });
 
   // Mutations for posts
@@ -135,7 +135,7 @@ export default function ContentEngagementPage() {
   });
 
   const declineEventMutation = useMutation({
-    mutationFn: declineEvent,
+    mutationFn: (eventId: string) => declineEvent(eventId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       toast.success('Event declined');

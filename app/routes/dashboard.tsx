@@ -31,8 +31,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/hooks/useDashboard";
-import { useUsers } from "@/hooks/useUsers";
-import type { User } from "@/lib/type";
+import { useUsersSummary } from "@/hooks/useUsers";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Mock Data for Charts
@@ -48,10 +47,9 @@ const engagementData = [
 
 export default function AdminOverview() {
   const { data: dashboardData, isLoading: loading, error: dashboardError } = useDashboard();
-  const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers(1, 100);
+  const { summary: usersSummary, isLoading: usersLoading, error: usersError } = useUsersSummary();
   
   const summary = dashboardData || null;
-  const users = usersResponse?.data || [];
 
   useEffect(() => {
     if (dashboardError) {
@@ -62,8 +60,8 @@ export default function AdminOverview() {
     }
   }, [dashboardError, usersError]);
 
-  const verifiedCount = users.filter((u) => u.isVerified).length;
-  const pendingCount = users.filter((u) => !u.isVerified).length;
+  const verifiedCount = usersSummary?.verifiedUsers ?? summary?.verifiedUsers ?? 0;
+  const pendingCount = usersSummary?.pendingUsers ?? summary?.pendingUsers ?? 0;
 
   const userDistribution = [
     { name: "Verified Alumni", value: verifiedCount, color: "#0f172a" },
