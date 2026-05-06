@@ -48,7 +48,6 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
     roomDescription: "",
   });
   const [files, setFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const DOCUMENT_TYPES = [
@@ -92,30 +91,8 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  React.useEffect(() => {
-    // regenerate previews array aligned with files array
-    setImagePreviews((prev) => {
-      const arr: (string | null)[] = Array(files.length).fill(null);
-      return arr;
-    });
-
-    files.forEach((file, index) => {
-      if (!file.type.startsWith("image/")) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        setImagePreviews((prev) => {
-          const copy = [...prev];
-          copy[index] = ev.target?.result as string;
-          return copy;
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-  }, [files]);
-
   const handleRemoveFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
@@ -144,7 +121,6 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
 
     setFormData({ roomName: "", roomDescription: "" });
     setFiles([]);
-    setImagePreviews([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
     onClose();
   };
@@ -208,7 +184,7 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
               >
                 <Upload className="h-4 w-4" />
                 <span className="text-sm text-muted-foreground">
-                  Click to upload files (documents & images) or drag and drop
+                  Click to upload documents and images
                 </span>
               </button>
             </div>
@@ -218,17 +194,13 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
                 {files.map((f, idx) => (
                   <div key={idx} className="relative rounded-lg overflow-hidden border border-muted-foreground/20 p-2 bg-secondary">
-                    {imagePreviews[idx] ? (
-                      <img src={imagePreviews[idx] || undefined} alt={f.name} className="w-full h-28 object-cover rounded" />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <File className="h-5 w-5" />
-                        <div className="min-w-0">
-                          <div className="text-sm truncate">{f.name}</div>
-                          <div className="text-xs text-muted-foreground">{(f.size / 1024 / 1024).toFixed(2)}MB</div>
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <File className="h-5 w-5" />
+                      <div className="min-w-0">
+                        <div className="text-sm truncate">{f.name}</div>
+                        <div className="text-xs text-muted-foreground">{(f.size / 1024 / 1024).toFixed(2)}MB</div>
                       </div>
-                    )}
+                    </div>
 
                     <button
                       onClick={() => handleRemoveFile(idx)}
