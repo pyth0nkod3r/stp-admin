@@ -14,6 +14,13 @@ export interface DealRoom {
   documentUrl: string;
 }
 
+export type DealRoomModerationAction = "approve" | "reject";
+
+export interface ModerateDealRoomPayload {
+  action: DealRoomModerationAction;
+  reason?: string;
+}
+
 export interface DealRoomsResponse {
   status: boolean;
   message: string;
@@ -25,6 +32,16 @@ export const apiDealRooms = {
     const result = await apiRequest<DealRoomsResponse>(API_ENDPOINTS.dealrooms.list, {
       method: "GET",
     });
+    return result.data ?? [];
+  },
+
+  async fetchPendingDealRooms(): Promise<DealRoom[]> {
+    const result = await apiRequest<DealRoomsResponse>(
+      API_ENDPOINTS.backoffice.pendingDealRooms,
+      {
+        method: "GET",
+      }
+    );
     return result.data ?? [];
   },
 
@@ -103,5 +120,23 @@ export const apiDealRooms = {
     await apiRequest(API_ENDPOINTS.dealrooms.memberById(roomId, userId), {
       method: "DELETE",
     });
+  },
+
+  async moderateDealRoom(
+    roomId: string,
+    payload: ModerateDealRoomPayload
+  ): Promise<void> {
+    await apiRequest(API_ENDPOINTS.backoffice.approveDealRoom(roomId), {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async approveDealRoom(roomId: string): Promise<void> {
+    await this.moderateDealRoom(roomId, { action: "approve" });
+  },
+
+  async rejectDealRoom(roomId: string, reason?: string): Promise<void> {
+    await this.moderateDealRoom(roomId, { action: "reject", reason });
   },
 };

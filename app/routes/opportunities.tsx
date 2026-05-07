@@ -58,10 +58,15 @@ export default function OpportunitiesPage() {
     dealRooms, 
     isLoading, 
     error,
+    pendingDealRooms,
+    pendingDealRoomsLoading,
+    pendingDealRoomsError,
     createMutation,
     updateMutation,
     deleteMutation,
     addMembersMutation,
+    approveMutation,
+    rejectMutation,
   } = useDealRooms();
   const [selectedTab, setSelectedTab] = useState("active");
 
@@ -135,6 +140,15 @@ export default function OpportunitiesPage() {
     }
   };
 
+  const handleApproveOpportunity = async (roomId: string) => {
+    await approveMutation.mutateAsync(roomId);
+  };
+
+  const handleRejectOpportunity = async (roomId: string) => {
+    const reason = window.prompt("Reason for rejecting this opportunity");
+    await rejectMutation.mutateAsync({ roomId, reason: reason?.trim() || undefined });
+  };
+
   const activeRooms = dealRooms.filter(room => room.isActive === "1");
   const totalVolume = activeRooms.length > 0 ? "$" + (activeRooms.length * 1.5).toFixed(1) + "M" : "$0";
   const activeRequests = activeRooms.reduce((sum, room) => sum + room.memberCount, 0);
@@ -158,6 +172,15 @@ export default function OpportunitiesPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             Failed to load opportunities. Please try again later.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {pendingDealRoomsError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load pending opportunities. Please try again later.
           </AlertDescription>
         </Alert>
       )}
@@ -186,12 +209,12 @@ export default function OpportunitiesPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Rooms</CardTitle>
-            <FileText className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+            <Clock className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dealRooms.length}</div>
-            <p className="text-xs text-muted-foreground">All deal rooms</p>
+            <div className="text-2xl font-bold">{pendingDealRooms.length}</div>
+            <p className="text-xs text-muted-foreground">Awaiting approval</p>
           </CardContent>
         </Card>
       </div>
@@ -200,10 +223,10 @@ export default function OpportunitiesPage() {
         <TabsList>
           <TabsTrigger value="active">Active Opportunities ({activeRooms.length})</TabsTrigger>
           <TabsTrigger value="all">All Opportunities ({dealRooms.length})</TabsTrigger>
-          <TabsTrigger value="requests">Access Requests</TabsTrigger>
+          <TabsTrigger value="pending">Pending Approval ({pendingDealRooms.length})</TabsTrigger>
         </TabsList>
 
-        {isLoading ? (
+        {isLoading || pendingDealRoomsLoading ? (
           <div className="flex items-center justify-center py-12 px-4">
             <div className="text-center">
               <Loader className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
@@ -250,20 +273,27 @@ export default function OpportunitiesPage() {
               )}
             </TabsContent>
 
-            <TabsContent value="requests">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Access Requests</CardTitle>
-                  <CardDescription>Review alumni asking for permission to access private opportunities.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p>No pending access requests</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+            <TabsContent value="pending" className="grid gap-4 md:grid-cols-2">
+              {pendingDealRooms.length > 0 ? (
+                pendingDealRooms.map((room) => (
+                  <OpportunityCard
+                    key={room.roomId}
+                    room={room}
+                    onViewDetails={() => handleViewDetails(room)}
+                    onEdit={() => handleEditClick(room)}
+                    onDelete={() => handleDeleteClick(room)}
+                    onManageMembers={() => handleManageMembersClick(room)}
+                    onApprove={() => handleApproveOpportunity(room.roomId)}
+                    onReject={() => handleRejectOpportunity(room.roomId)}
+                    isModerating={approveMutation.isPending || rejectMutation.isPending}
+                  />
+                ))
+              ) : (
+                <div className="col-span-2 text-center py-12 text-muted-foreground">
+                  <ShieldCheck className="h-8 w-8 mx-auto mb-3 opacity-60" />
+                  <p>No pending opportunities found</p>
+                </div>
+              )}
             </TabsContent>
           </>
         )}
@@ -317,12 +347,18 @@ function OpportunityCard({
   onEdit,
   onDelete,
   onManageMembers,
+  onApprove,
+  onReject,
+  isModerating = false,
 }: {
   room: DealRoom;
   onViewDetails: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onManageMembers: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
+  isModerating?: boolean;
 }) {
   const status = room.isActive === "1" ? "Active" : "Inactive";
 
@@ -381,9 +417,30 @@ function OpportunityCard({
           <Progress value={Math.floor(Math.random() * 100)} className="h-2" />
         </div>
 
-        <Button className="w-full" variant="outline">
-          Audit Documents & Threads
-        </Button>
+        {onApprove && onReject ? (
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50"
+              onClick={onReject}
+              disabled={isModerating}
+            >
+              Reject
+            </Button>
+            <Button
+              variant="outline"
+              className="border-green-200 text-green-700 hover:bg-green-50"
+              onClick={onApprove}
+              disabled={isModerating}
+            >
+              Approve
+            </Button>
+          </div>
+        ) : (
+          <Button className="w-full" variant="outline">
+            Audit Documents & Threads
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

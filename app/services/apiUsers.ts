@@ -143,12 +143,15 @@ export async function verifyUser(userId: string): Promise<void> {
 }
 
 export async function createUser(payload: CreateUserPayload): Promise<void> {
+  const emailAddress = payload.emailAddress ?? payload.email ?? "";
+
   await apiRequest(API_ENDPOINTS.backoffice.onboardUser, {
     method: "POST",
     body: JSON.stringify({
       firstName: payload.firstName,
       lastName: payload.lastName,
-      email: payload.email ?? payload.emailAddress ?? "",
+      emailAddress,
+      email: emailAddress,
       cohort: payload.cohort ?? "",
     }),
   });

@@ -25,6 +25,17 @@ export const useDealRooms = () => {
     retry: 1,
   });
 
+  const {
+    data: pendingDealRooms = [],
+    isLoading: pendingDealRoomsLoading,
+    error: pendingDealRoomsError,
+  } = useQuery({
+    queryKey: ["dealRooms", "pending"],
+    queryFn: apiDealRooms.fetchPendingDealRooms,
+    staleTime: 60 * 1000,
+    retry: 1,
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: {
       roomName: string;
@@ -94,16 +105,46 @@ export const useDealRooms = () => {
     },
   });
 
+  const approveMutation = useMutation({
+    mutationFn: (roomId: string) => apiDealRooms.approveDealRoom(roomId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dealRooms"] });
+      queryClient.invalidateQueries({ queryKey: ["dealRooms", "pending"] });
+      toast.success("Opportunity approved successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to approve opportunity: ${error.message}`);
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ roomId, reason }: { roomId: string; reason?: string }) =>
+      apiDealRooms.rejectDealRoom(roomId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dealRooms"] });
+      queryClient.invalidateQueries({ queryKey: ["dealRooms", "pending"] });
+      toast.success("Opportunity rejected successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to reject opportunity: ${error.message}`);
+    },
+  });
+
   return {
     dealRooms,
+    pendingDealRooms,
     isLoading,
+    pendingDealRoomsLoading,
     error,
+    pendingDealRoomsError,
     refetch,
     createMutation,
     updateMutation,
     deleteMutation,
     addMembersMutation,
     removeMemberMutation,
+    approveMutation,
+    rejectMutation,
   };
 };
 
