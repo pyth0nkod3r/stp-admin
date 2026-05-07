@@ -7,5 +7,6 @@
 /build/
 .specstory
 .vscode
-.claude
-
+.kilocode
+tsconfig.tsbuildinfo
+.codex

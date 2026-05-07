@@ -1,12 +1,13 @@
 import {
   LayoutDashboard,
   Users,
-  Car,
-  DollarSign,
-  MessageSquare,
-  UserCircle,
+  Briefcase,
+  Megaphone,
+  Settings,
+  ShieldCheck,
   LogOut,
-  Contact,
+  UserPlus,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -21,18 +22,32 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLocation } from "react-router";
 import { NavLink } from "./nav-link";
 import { toast } from "sonner";
 
-const mainItems = [
+type SidebarItem = {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  roles?: string[];
+};
+
+const mainItems: SidebarItem[] = [
   { title: "Overview", url: "/admin/dashboard", icon: LayoutDashboard },
   { title: "User Directory", url: "/admin/users", icon: Users },
-  { title: "Verification Queue", url: "/admin/verification", icon: UserCircle },
-  { title: "Deal Rooms", url: "/admin/deals", icon: Car },
-  { title: "Content & Engagement", url: "/admin/content", icon: DollarSign },
-  { title: "System & Management", url: "/admin/system", icon: MessageSquare },
+  { title: "Groups", url: "/admin/groups", icon: ShieldCheck },
+  // { title: "Verification Queue", url: "/admin/verification", icon: ShieldCheck }, // NOTE: No longer needed
+  { title: "Opportunities", url: "/admin/opportunities", icon: Briefcase },
+  { title: "Content & Engagement", url: "/admin/content", icon: Megaphone },
+  {
+    title: "Register Admin",
+    url: "/admin/register-admin",
+    icon: UserPlus,
+    roles: ["BACKOFFICE", "ADMIN"],
+  },
+  { title: "System & Management", url: "/admin/system", icon: Settings },
   // { title: "Contacts", url: "/admin/contacts", icon: Contact },
 ];
 
@@ -43,6 +58,7 @@ export function AppSidebar() {
 
   const userName = localStorage.getItem("stp_user_name") || "Admin";
   const userEmail = localStorage.getItem("stp_user_email") || "";
+  const userRole = localStorage.getItem("stp_user_role") || "";
   const initials = userName
     .split(" ")
     .map((n) => n[0])
@@ -59,6 +75,7 @@ export function AppSidebar() {
     localStorage.removeItem("stp_token");
     localStorage.removeItem("stp_user_name");
     localStorage.removeItem("stp_user_email");
+    localStorage.removeItem("stp_user_role");
     toast.success("Logged out successfully");
     window.location.replace("/login");
   }
@@ -66,14 +83,17 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <div className={`${open ? "px-6" : "mx-auto"} py-6`}>
-          <h2 className="text-xl font-bold text-sidebar-primary">
-            {open ? "Stp" : <Car className="w-6 h-6 text-sidebar-primary" />}
-          </h2>
+        <div className={`${open ? "px-6" : "mx-auto"} py-6 flex items-center gap-3`}>
+          <img src="/logo.png" alt="STP Alumni Logo" className={open ? "w-10 h-10 object-contain drop-shadow" : "w-8 h-8 object-contain drop-shadow"} />
           {open && (
-            <p className="text-xs text-sidebar-foreground/70 mt-1">
-              Admin Dashboard
-            </p>
+            <div>
+              <h2 className="text-xl font-bold text-sidebar-primary leading-tight">
+                STP Alumni Network
+              </h2>
+              <p className="text-xs text-sidebar-foreground/70 mt-1">
+                Admin Dashboard
+              </p>
+            </div>
           )}
         </div>
 
@@ -82,6 +102,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
+                item.roles && userRole && !item.roles.includes(userRole) ? null : (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink
@@ -94,6 +115,7 @@ export function AppSidebar() {
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                )
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -105,6 +127,7 @@ export function AppSidebar() {
         >
           <div className="flex items-center gap-3 overflow-hidden">
             <Avatar className="h-9 w-9 shrink-0">
+              <AvatarImage src={`https://i.pravatar.cc/150?u=${userEmail}`} alt={userName} />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
 
@@ -121,13 +144,13 @@ export function AppSidebar() {
           </div>
 
           {/* {open && ( */}
-            <button
-              onClick={logout}
-              className="p-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md transition-colors"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4 text-muted-foreground" />
-            </button>
+          <button
+            onClick={logout}
+            className="p-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md transition-colors"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4 text-muted-foreground" />
+          </button>
           {/* )} */}
         </div>
       </SidebarFooter>

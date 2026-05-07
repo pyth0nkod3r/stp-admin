@@ -1,22 +1,22 @@
-import { useState, useEffect } from "react";
-import {
-  Users,
-  Car,
-  ShieldAlert,
-  MousePointer2,
-  TrendingUp,
-  ArrowUpRight
+import React, { useEffect } from "react";
+import { 
+  Users, 
+  Briefcase, 
+  ShieldAlert, 
+  MousePointer2, 
+  TrendingUp, 
+  ArrowUpRight,
+  CalendarDays
 } from "lucide-react";
 import { MessageSquare, Zap, FileDown, PlusCircle } from "lucide-react";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription 
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart,
   Bar,
@@ -30,9 +30,9 @@ import {
   Cell,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { fetchDashboardSummary, type DashboardSummary } from "@/services/apiDashboard";
-import { fetchUsers } from "@/services/apiUsers";
-import type { User } from "@/lib/type";
+import { useDashboard } from "@/hooks/useDashboard";
+import { useUsersSummary } from "@/hooks/useUsers";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Mock Data for Charts
 const engagementData = [
@@ -46,28 +46,25 @@ const engagementData = [
 ];
 
 export default function AdminOverview() {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<User[]>([]);
-  const [usersLoading, setUsersLoading] = useState(true);
+  const { data: dashboardData, isLoading: loading, error: dashboardError } = useDashboard();
+  const { summary: usersSummary, isLoading: usersLoading, error: usersError } = useUsersSummary();
+  
+  const summary = dashboardData || null;
 
   useEffect(() => {
-    fetchDashboardSummary()
-      .then((res) => setSummary(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    if (dashboardError) {
+      console.error("Dashboard error:", dashboardError);
+    }
+    if (usersError) {
+      console.error("Users error:", usersError);
+    }
+  }, [dashboardError, usersError]);
 
-    fetchUsers(1, 100)
-      .then((res) => setUsers(res.data))
-      .catch(() => {})
-      .finally(() => setUsersLoading(false));
-  }, []);
-
-  const verifiedCount = users.filter((u) => u.isVerified).length;
-  const pendingCount = users.filter((u) => !u.isVerified).length;
+  const verifiedCount = usersSummary?.verifiedUsers ?? summary?.verifiedUsers ?? 0;
+  const pendingCount = usersSummary?.pendingUsers ?? summary?.pendingUsers ?? 0;
 
   const userDistribution = [
-    { name: "Verified", value: verifiedCount, color: "#0f172a" },
+    { name: "Verified Alumni", value: verifiedCount, color: "#0f172a" },
     { name: "Pending", value: pendingCount, color: "#f97316" },
   ];
 
@@ -79,34 +76,35 @@ export default function AdminOverview() {
 
       {/* Top Level Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <MetricCard 
+          title="Total Alumni" 
+          value={summary?.totalUsers} 
+          description="Total registered alumni" 
+          icon={<Users className="h-4 w-4 text-muted-foreground" />} 
+          loading={loading}
+        />
+        <MetricCard 
+          title="Active Alumni" 
+          value={summary?.activeUsers} 
+          description="Currently active alumni" 
+          icon={<Zap className="h-4 w-4 text-muted-foreground" />} 
+          loading={loading}
+        />
         <MetricCard
-          title="Total Users"
-          value={summary?.totalUsers ?? null}
-          description="Verified vs Guests"
+          title="Active Groups"
+          value={summary?.totalGroups}
+          description={`${summary?.pendingGroups || 0} pending approval`}
           icon={<Users className="h-4 w-4 text-muted-foreground" />}
           loading={loading}
+          highlight={summary?.pendingGroups ? summary.pendingGroups > 0 : false}
         />
-        <MetricCard
-          title="Active Deal Rooms"
-          value={summary?.totaldealRooms ?? null}
-          description=""
-          icon={<Car className="h-4 w-4 text-muted-foreground" />}
+        <MetricCard 
+          title="Active Events" 
+          value={summary?.totalEvents} 
+          description={`${summary?.pendingEvents || 0} pending approval`} 
+          icon={<CalendarDays className="h-4 w-4 text-muted-foreground" />} 
           loading={loading}
-        />
-        <MetricCard
-          title="Pending Verifications"
-          value={usersLoading ? null : pendingCount}
-          description="Needs your attention"
-          icon={<ShieldAlert className="h-4 w-4 text-orange-500" />}
-          highlight
-          loading={usersLoading}
-        />
-        <MetricCard
-          title="Marketplace Clicks"
-          value={null}
-          description=""
-          icon={<MousePointer2 className="h-4 w-4 text-muted-foreground" />}
-          loading={false}
+          highlight={summary?.pendingEvents ? summary.pendingEvents > 0 : false}
         />
       </div>
 
@@ -114,7 +112,7 @@ export default function AdminOverview() {
         {/* Engagement Chart */}
         <Card className="col-span-4">
           <CardHeader>
-            <CardTitle>Marketplace Engagement</CardTitle>
+            <CardTitle>Alumni Connections</CardTitle>
             <CardDescription>Total "Connect" and "Chat" clicks initiated</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
@@ -135,10 +133,10 @@ export default function AdminOverview() {
           </CardContent>
         </Card>
 
-        {/* User Distribution */}
+        {/* Alumni Distribution */}
         <Card className="col-span-3">
           <CardHeader>
-            <CardTitle>User Distribution</CardTitle>
+            <CardTitle>Alumni Distribution</CardTitle>
             <CardDescription>Verified vs. Pending Verification</CardDescription>
           </CardHeader>
           <CardContent>
@@ -195,9 +193,9 @@ export default function AdminOverview() {
     <CardContent>
       <div className="space-y-6">
         {[
-          { icon: <PlusCircle className="text-blue-500" />, text: "New Deal Room created", sub: "Tech Startup Seed Funding", time: "12m ago" },
+          { icon: <PlusCircle className="text-blue-500" />, text: "New Opportunity Posted", sub: "Tech Startup Seed Funding", time: "12m ago" },
           { icon: <Zap className="text-yellow-500" />, text: "New Alumni joined", sub: "Dr. Sarah Jenkins (Class of '18)", time: "45m ago" },
-          { icon: <MessageSquare className="text-green-500" />, text: "Marketplace Inquiry", sub: "Interest in 'UI Design Service'", time: "2h ago" },
+          { icon: <MessageSquare className="text-green-500" />, text: "Connection Request", sub: "Interest in 'UI Design Service'", time: "2h ago" },
           { icon: <FileDown className="text-muted-foreground" />, text: "Resource Downloaded", sub: "Investment_Template.pdf", time: "3h ago" },
         ].map((item, i) => (
           <div key={i} className="flex items-start gap-4">
@@ -269,24 +267,17 @@ export default function AdminOverview() {
 function MetricCard({ title, value, description, icon, highlight = false, loading = false }: any) {
   return (
     <Card className={highlight ? "border-orange-200 bg-orange-50/30" : ""}>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 min-h-[68px]">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {icon}
       </CardHeader>
       <CardContent>
         {loading ? (
-          <>
-            <Skeleton className="h-8 w-20 mb-1" />
-            <Skeleton className="h-3 w-28" />
-          </>
+          <Skeleton className="h-8 w-16 mb-1" />
         ) : (
-          <>
-            <div className="text-2xl font-bold leading-8">
-              {value !== null ? value.toLocaleString() : "—"}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 min-h-[16px]">{description}</p>
-          </>
+          <div className="text-2xl font-bold">{value !== null && value !== undefined ? value : 0}</div>
         )}
+        <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </CardContent>
     </Card>
   );

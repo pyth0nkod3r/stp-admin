@@ -1,5 +1,5 @@
 // src/hooks/useLogin.ts
-import { login } from "@/services/apiAuth";
+import { login, register, type RegisterPayload } from "@/services/apiAuth";
 import { useMutation } from "@tanstack/react-query";
 
 export function useLogin() {
@@ -9,4 +9,13 @@ export function useLogin() {
   });
 
   return { mutate, isPending, error };
+}
+
+export function useRegisterAdmin() {
+  const { mutate, mutateAsync, isPending, error } = useMutation({
+    mutationFn: (payload: RegisterPayload) => register(payload),
+    mutationKey: ["register-admin"],
+  });
+
+  return { mutate, mutateAsync, isPending, error };
 }

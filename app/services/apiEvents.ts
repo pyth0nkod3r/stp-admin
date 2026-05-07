@@ -1,24 +1,18 @@
 import type { Event } from "@/lib/type";
-import { API_BASE_URL } from "./config";
+import { apiRequest } from "./apiClient";
+import { API_ENDPOINTS } from "./endpoints";
+
+export type EventStatusFilter = "ALL" | "ACTIVE" | "PENDING_APPROVAL" | "REJECTED";
+export type EventModerationAction = "approve" | "reject";
+
+export interface BackofficeEvent extends Event {
+  eventStatus: "approved" | "pending" | "rejected";
+}
 
 export interface EventsResponse {
   status: boolean;
   message: string;
-  data: Event[];
-}
-
-export async function fetchEvents(): Promise<EventsResponse> {
-  const response = await fetch(`${API_BASE_URL}/events`, {
-    method: "GET",
-    redirect: "follow",
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to fetch events");
-  }
-
-  return response.json();
+  data: BackofficeEvent[];
 }
 
 export interface CreateEventPayload {
@@ -45,66 +39,129 @@ export interface CreateEventResponse {
 export interface EventDetailResponse {
   status: boolean;
   message: string;
-  data: Event;
+  data: BackofficeEvent;
 }
 
-export async function fetchEventById(
-  eventId: string
-): Promise<EventDetailResponse> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
+export interface ApproveEventPayload {
+  action: EventModerationAction;
+  reason?: string;
+}
 
-  const response = await fetch(`${API_BASE_URL}/events/${eventId}`, {
+function normalizeEventStatus(rawStatus: unknown): BackofficeEvent["eventStatus"] {
+  const status = String(rawStatus ?? "").toUpperCase();
+  if (status.includes("PENDING")) return "pending";
+  if (status.includes("REJECT")) return "rejected";
+  if (status.includes("APPROVE") || status.includes("ACTIVE")) return "approved";
+  return "approved";
+}
+
+function normalizeEvent(event: any, fallbackStatus?: unknown): BackofficeEvent {
+  return {
+    eventId: event?.eventId ?? event?.id ?? "",
+    type: String(event?.type ?? "online").toLowerCase(),
+    format: event?.format ?? "",
+    name: event?.name ?? "",
+    timeZone: event?.timeZone ?? "UTC",
+    startTime: event?.startTime ?? event?.startDateTime ?? "",
+    endTime: event?.endTime ?? event?.endDateTime ?? event?.startTime ?? "",
+    description: event?.description ?? "",
+    externalLink: event?.externalLink ?? "",
+    address: event?.address ?? "",
+    venue: event?.venue ?? "",
+    createdBy: event?.createdBy ?? "",
+    createdAt: event?.createdAt ?? "",
+    updatedAt: event?.updatedAt ?? "",
+    coverImageUrl: event?.coverImageUrl ?? event?.coverImagePath ?? "",
+    eventStatus: normalizeEventStatus(event?.eventStatus ?? event?.status ?? fallbackStatus),
+  };
+}
+
+function extractRows(result: any): any[] {
+  if (Array.isArray(result?.data)) return result.data;
+  if (Array.isArray(result)) return result;
+  return [];
+}
+
+export async function fetchEvents(status: EventStatusFilter = "ALL"): Promise<EventsResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.events, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    redirect: "follow",
+    query: { status },
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to fetch event details");
-  }
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Events fetched successfully",
+    data: extractRows(result).map((event) => normalizeEvent(event, status)),
+  };
+}
 
-  return response.json();
+export async function fetchPendingEvents(): Promise<EventsResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.pendingEvents, {
+    method: "GET",
+  });
+
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Pending events fetched successfully",
+    data: extractRows(result).map((event) => normalizeEvent(event, "PENDING_APPROVAL")),
+  };
+}
+
+export async function fetchEventById(eventId: string): Promise<EventDetailResponse> {
+  const result = await apiRequest<any>(API_ENDPOINTS.events.byId(eventId), {
+    method: "GET",
+  });
+
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Event details fetched successfully",
+    data: normalizeEvent(result?.data ?? result),
+  };
 }
 
 export async function createEvent(
   payload: CreateEventPayload
 ): Promise<CreateEventResponse> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const formdata = new FormData();
-  formdata.append("type", payload.type);
-  formdata.append("format", "json");
-  formdata.append("name", payload.name);
-  formdata.append("timeZone", payload.timeZone);
-  formdata.append("startTime", payload.startTime);
-  formdata.append("endTime", payload.endTime);
-  formdata.append("description", payload.description);
-  formdata.append("externalLink", payload.externalLink);
-  formdata.append("address", payload.address);
-  formdata.append("venue", payload.venue);
+  const formData = new FormData();
+  formData.append("type", payload.type);
+  formData.append("name", payload.name);
+  formData.append("timeZone", payload.timeZone);
+  formData.append("startTime", payload.startTime);
+  formData.append("endTime", payload.endTime);
+  formData.append("description", payload.description);
+  formData.append("externalLink", payload.externalLink);
+  formData.append("address", payload.address);
+  formData.append("venue", payload.venue);
   if (payload.coverImage) {
-    formdata.append("coverImage", payload.coverImage);
+    formData.append("coverImage", payload.coverImage);
   }
 
-  const response = await fetch(`${API_BASE_URL}/events`, {
+  const result = await apiRequest<any>(API_ENDPOINTS.events.create, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formdata,
-    redirect: "follow",
+    body: formData,
   });
 
-  const result = await response.json();
+  return {
+    status: Boolean(result?.status ?? true),
+    message: result?.message ?? "Event created successfully",
+    data: result?.data ?? { eventId: "" },
+  };
+}
 
-  if (!response.ok) {
-    throw new Error(result?.message || "Failed to create event");
-  }
+export async function moderateEvent(
+  eventId: string,
+  payload: ApproveEventPayload
+): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.approveEvent(eventId), {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
 
-  return result;
+export async function approveEvent(eventId: string): Promise<void> {
+  await moderateEvent(eventId, { action: "approve" });
+}
+
+export async function declineEvent(eventId: string, reason?: string): Promise<void> {
+  await moderateEvent(eventId, { action: "reject", reason });
 }

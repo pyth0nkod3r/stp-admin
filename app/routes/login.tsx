@@ -17,13 +17,13 @@ import type { Route } from "../+types/root";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Stp Alumni - Admin Login" },
-    { name: "description", content: "Stp Alumnni admin login page" },
+    { title: "STP Alumni - Admin Login" },
+    { name: "description", content: "STP Alumni admin login page" },
   ];
 }
 
 const Login = () => {
-  const token = localStorage.getItem("stp_token");
+  const token = typeof window !== "undefined" ? localStorage.getItem("stp_token") : null;
   if (token) return <Navigate to="/admin/dashboard" replace />;
 
   const navigate = useNavigate();
@@ -67,10 +67,10 @@ const Login = () => {
           </div>
           <div>
             <CardTitle className="text-2xl font-bold tracking-tight">
-              Stp Admin
+              STP Alumni Network
             </CardTitle>
             <CardDescription className="text-muted-foreground mt-1">
-              Sign in to access the dashboard
+              Sign in to access the admin dashboard
             </CardDescription>
           </div>
         </CardHeader>
@@ -96,12 +96,13 @@ const Login = () => {
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password
                 </Label>
-                {/* <button
+                <button
                   type="button"
                   className="text-xs text-primary hover:text-primary/80 transition-colors"
+                  onClick={() => navigate("/forgot-password")}
                 >
                   Forgot password?
-                </button> */}
+                </button>
               </div>
               <div className="relative">
                 <Input

@@ -1,6 +1,25 @@
-import type { DealRoom } from "@/lib/type";
-import { API_BASE_URL } from "./config";
+import { apiRequest } from "./apiClient";
+import { API_ENDPOINTS } from "./endpoints";
 
+export interface DealRoom {
+  roomId: string;
+  roomName: string;
+  roomDescription: string;
+  isActive: string;
+  createdAt: string;
+  firstName: string;
+  lastName: string;
+  createdByEmail: string;
+  memberCount: number;
+  documentUrl: string;
+}
+
+export type DealRoomModerationAction = "approve" | "reject";
+
+export interface ModerateDealRoomPayload {
+  action: DealRoomModerationAction;
+  reason?: string;
+}
 
 export interface DealRoomsResponse {
   status: boolean;
@@ -8,63 +27,116 @@ export interface DealRoomsResponse {
   data: DealRoom[];
 }
 
-export async function fetchDealRooms(): Promise<DealRoomsResponse> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
+export const apiDealRooms = {
+  async fetchAllDealRooms(): Promise<DealRoom[]> {
+    const result = await apiRequest<DealRoomsResponse>(API_ENDPOINTS.dealrooms.list, {
+      method: "GET",
+    });
+    return result.data ?? [];
+  },
 
-  const response = await fetch(`${API_BASE_URL}/dealroom`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    redirect: "follow",
-  });
+  async fetchPendingDealRooms(): Promise<DealRoom[]> {
+    const result = await apiRequest<DealRoomsResponse>(
+      API_ENDPOINTS.backoffice.pendingDealRooms,
+      {
+        method: "GET",
+      }
+    );
+    return result.data ?? [];
+  },
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.message || "Failed to fetch deal rooms");
-  }
+  async fetchDealRoom(roomId: string): Promise<DealRoom> {
+    const result = await apiRequest<{ status: boolean; data: DealRoom }>(
+      API_ENDPOINTS.dealrooms.byId(roomId),
+      {
+        method: "GET",
+      }
+    );
+    return result.data;
+  },
 
-  return response.json();
-}
+  async createDealRoom(roomData: {
+    roomName: string;
+    roomDescription: string;
+    members?: string[];
+    document: File;
+    images?: File[];
+  }): Promise<DealRoom> {
+    const formData = new FormData();
+    formData.append("roomName", roomData.roomName);
+    formData.append("roomDescription", roomData.roomDescription);
 
-export interface CreateDealRoomPayload {
-  roomName: string;
-  roomDescription: string;
-  members: string[];
-  document?: File;
-}
+    if (roomData.members?.length) {
+      roomData.members.forEach((memberId, index) => {
+        formData.append(`members[${index}]`, memberId);
+      });
+    }
 
-export async function createDealRoom(
-  payload: CreateDealRoomPayload
-): Promise<{ status: boolean; message: string }> {
-  const token = localStorage.getItem("stp_token");
-  if (!token) throw new Error("Not authenticated");
+    formData.append("document", roomData.document);
 
-  const formdata = new FormData();
-  formdata.append("roomName", payload.roomName);
-  formdata.append("roomDescription", payload.roomDescription);
-  payload.members.forEach((id, i) => {
-    formdata.append(`members[${i}]`, id);
-  });
-  if (payload.document) {
-    formdata.append("document", payload.document);
-  }
+    if (roomData.images?.length) {
+      roomData.images.forEach((image) => formData.append("images", image));
+    }
 
-  const response = await fetch(`${API_BASE_URL}/dealroom`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formdata,
-    redirect: "follow",
-  });
+    const result = await apiRequest<{ status: boolean; data: DealRoom }>(
+      API_ENDPOINTS.dealrooms.list,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
 
-  const result = await response.json();
+    return result.data;
+  },
 
-  if (!response.ok) {
-    throw new Error(result?.message || "Failed to create deal room");
-  }
+  async updateDealRoom(
+    roomId: string,
+    updateData: Partial<{ roomName: string; roomDescription: string }>
+  ): Promise<DealRoom> {
+    const result = await apiRequest<{ status: boolean; data: DealRoom }>(
+      API_ENDPOINTS.dealrooms.byId(roomId),
+      {
+        method: "PUT",
+        body: JSON.stringify(updateData),
+      }
+    );
+    return result.data;
+  },
 
-  return result;
-}
+  async deleteDealRoom(roomId: string): Promise<void> {
+    await apiRequest(API_ENDPOINTS.dealrooms.byId(roomId), {
+      method: "DELETE",
+    });
+  },
+
+  async addMembersToRoom(roomId: string, members: string[]): Promise<void> {
+    await apiRequest(API_ENDPOINTS.dealrooms.members(roomId), {
+      method: "POST",
+      body: JSON.stringify({ members }),
+    });
+  },
+
+  async removeMemberFromRoom(roomId: string, userId: string): Promise<void> {
+    await apiRequest(API_ENDPOINTS.dealrooms.memberById(roomId, userId), {
+      method: "DELETE",
+    });
+  },
+
+  async moderateDealRoom(
+    roomId: string,
+    payload: ModerateDealRoomPayload
+  ): Promise<void> {
+    await apiRequest(API_ENDPOINTS.backoffice.approveDealRoom(roomId), {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async approveDealRoom(roomId: string): Promise<void> {
+    await this.moderateDealRoom(roomId, { action: "approve" });
+  },
+
+  async rejectDealRoom(roomId: string, reason?: string): Promise<void> {
+    await this.moderateDealRoom(roomId, { action: "reject", reason });
+  },
+};

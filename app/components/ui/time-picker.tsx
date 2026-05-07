@@ -31,7 +31,7 @@ function WheelColumn({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const selectedRef = React.useRef<HTMLButtonElement>(null);
   const didMount = React.useRef(false);
-  const wheelTimeout = React.useRef<ReturnType<typeof setTimeout>>();
+  const wheelTimeout = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Scroll the selected item into center view
   React.useEffect(() => {

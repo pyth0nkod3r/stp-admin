@@ -1,15 +1,52 @@
-import { fetchEvents } from "@/services/apiEvents";
 import { useQuery } from "@tanstack/react-query";
+import { fetchEvents, fetchPendingEvents, type BackofficeEvent } from "@/services/apiEvents";
+
+interface EventsQueryResult {
+  events: BackofficeEvent[];
+  approvedEvents: BackofficeEvent[];
+  pendingEvents: BackofficeEvent[];
+}
 
 export function useEvents() {
-  const { data, isLoading, error } = useQuery({
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("stp_token");
+
+  const { data, isLoading, error } = useQuery<EventsQueryResult>({
     queryKey: ["events"],
-    queryFn: fetchEvents,
+    enabled: hasToken,
+    queryFn: async () => {
+      const [allRes, pendingRes] = await Promise.all([
+        fetchEvents("ALL"),
+        fetchPendingEvents(),
+      ]);
+
+      const merged = new Map<string, BackofficeEvent>();
+
+      allRes.data.forEach((event) => {
+        merged.set(event.eventId, event);
+      });
+
+      pendingRes.data.forEach((event) => {
+        merged.set(event.eventId, { ...event, eventStatus: "pending" });
+      });
+
+      const events = Array.from(merged.values()).sort(
+        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
+
+      return {
+        events,
+        approvedEvents: events.filter((event) => event.eventStatus === "approved"),
+        pendingEvents: events.filter((event) => event.eventStatus === "pending"),
+      };
+    },
+    staleTime: 30 * 1000,
   });
 
   return {
-    events: data?.data ?? [],
+    events: data?.events ?? [],
+    approvedEvents: data?.approvedEvents ?? [],
+    pendingEvents: data?.pendingEvents ?? [],
     isLoading,
-    error,
+    error: error instanceof Error ? error.message : null,
   };
 }

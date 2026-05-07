@@ -1,5 +1,6 @@
 import type { Contact } from "@/lib/type";
 import { API_BASE_URL } from "./config";
+import { clearAuthAndRedirect } from "./authUtils";
 
 
 
@@ -16,12 +17,16 @@ export async function getContacts(): Promise<Contact[]> {
     
     },
   });
-const data = await response.json();
-
   if (!response.ok) {
+    if (response.status === 401) {
+      clearAuthAndRedirect();
+      throw new Error("Session expired");
+    }
     const err = await response.json().catch(() => null);
     throw new Error(err?.message || "Failed to fetch contacts");
   }
+
+  const data = await response.json();
 
 //   console.log(data, "contacts");
 

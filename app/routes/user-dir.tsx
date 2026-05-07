@@ -5,11 +5,17 @@ import {
   UserPlus,
   GraduationCap,
   ShieldCheck,
-  Mail,
+  Clock,
   Trash2,
   ExternalLink,
   Filter,
-  Loader2
+  Loader2,
+  FileDown,
+  UserCheck,
+  UserX,
+  Lock,
+  Unlock,
+  Settings
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,35 +48,97 @@ import {
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
-import { useUsers, useAllUsers } from "@/hooks/useUsers";
-import { createUser } from "@/services/apiUsers";
-import { useQueryClient } from "@tanstack/react-query";
+import { useUsers, useAllUsers, useUserProfile, useUsersSummary } from "@/hooks/useUsers";
+import {
+  useCreateUserMutation,
+  useVerifyUserMutation,
+  useDeleteUserMutation,
+  useActivateUserMutation,
+  useDeactivateUserMutation,
+  useLockUserMutation,
+  useUnlockUserMutation,
+  useChangeUserRoleMutation,
+} from "@/hooks/useUsersMutations";
 import type { User } from "@/lib/type";
+
+const getInitials = (firstName: string, lastName: string) => {
+  return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase();
+};
 
 export default function UserDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
   const perPage = 10;
 
+  const handleStatusFilter = (filter: string) => {
+    setStatusFilter(filter);
+    setPage(1);
+  };
+
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    setPage(1);
+  };
+
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ firstName: "", lastName: "", emailAddress: "" });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const queryClient = useQueryClient();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [roleChangeOpen, setRoleChangeOpen] = useState(false);
+  const [userToChangeRole, setUserToChangeRole] = useState<User | null>(null);
+  const [newRole, setNewRole] = useState("");
+
+  // Mutations
+  const createUserMutation = useCreateUserMutation();
+  const verifyUserMutation = useVerifyUserMutation();
+  const deleteUserMutation = useDeleteUserMutation();
+  const activateUserMutation = useActivateUserMutation();
+  const deactivateUserMutation = useDeactivateUserMutation();
+  const lockUserMutation = useLockUserMutation();
+  const unlockUserMutation = useUnlockUserMutation();
+  const changeUserRoleMutation = useChangeUserRoleMutation();
 
   const { data: usersResponse, isLoading, error, hasNextPage } = useUsers(page, perPage);
   const users = usersResponse?.data ?? [];
 
   // Fetch all users for stat counts (independent of pagination)
-  const { data: allUsersResponse } = useAllUsers();
+  const { data: allUsersResponse, isLoading: allUsersLoading } = useAllUsers();
+  const { summary: usersSummary } = useUsersSummary();
   const allUsers = allUsersResponse?.data ?? [];
-  const totalCount = allUsers.length;
-  const verifiedCount = allUsers.filter((u: User) => u.isVerified).length;
-  const pendingCount = allUsers.filter((u: User) => !u.isVerified).length;
+  const totalCount = usersSummary?.totalUsers ?? allUsers.length;
+  const verifiedCount =
+    usersSummary?.verifiedUsers ?? allUsers.filter((u: User) => u.isVerified).length;
+  const pendingCount =
+    usersSummary?.pendingUsers ?? allUsers.filter((u: User) => !u.isVerified).length;
 
-  // Real-time Search Functionality
+  // When filtering/searching, apply across all users (not just the current page)
+  const isFiltering = statusFilter !== "ALL" || searchTerm !== "";
+
   const filteredUsers = useMemo(() => {
-    return users.filter((person) => {
+    // Use allUsers as source when filtering so results aren't limited to current page
+    const source = isFiltering ? allUsers : users;
+
+    let result = source;
+
+    if (statusFilter === "VERIFIED") {
+      result = result.filter(p => p.isVerified);
+    } else if (statusFilter === "PENDING") {
+      result = result.filter(p => !p.isVerified);
+    }
+
+    return result.filter((person) => {
       const searchable = [
         person.firstName,
         person.lastName,
@@ -81,16 +149,125 @@ export default function UserDirectoryPage() {
         val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
-  }, [searchTerm, users]);
+  }, [searchTerm, users, allUsers, statusFilter, isFiltering]);
 
-  // TODO: Implement delete via API endpoint
-  const handleDelete = (userId: string) => {
-    toast.error("Delete not yet connected to API");
+  // When filtering client-side, paginate the filtered results manually
+  const displayedUsers = isFiltering
+    ? filteredUsers.slice((page - 1) * perPage, page * perPage)
+    : filteredUsers;
+  const totalFilteredPages = isFiltering ? Math.ceil(filteredUsers.length / perPage) : null;
+  const showNextPage = isFiltering ? page < (totalFilteredPages ?? 1) : hasNextPage;
+
+  const handleExportCSV = () => {
+    const exportData = allUsers.map(u => ({
+      "First Name": u.firstName,
+      "Last Name": u.lastName,
+      "Email Address": u.email,
+      "Status": u.isVerified ? "Verified Alumni" : "Pending",
+      "Role": u.role || "USER",
+    }));
+
+    if (exportData.length === 0) {
+      toast.error("No data to export");
+      return;
+    }
+
+    const headers = Object.keys(exportData[0]).join(",");
+    const rows = exportData.map(obj => Object.values(obj).map(val => `"${val}"`).join(","));
+    const csvContent = [headers, ...rows].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `alumni_directory_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("CSV exported successfully");
   };
 
-  // TODO: Implement verify via API endpoint
-  const handleVerify = (userId: string) => {
-    toast.success("Verify not yet connected to API");
+  const handleDelete = async (user: User) => {
+    setUserToDelete(user);
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+
+    try {
+      await deleteUserMutation.mutateAsync(userToDelete.userId);
+      setDeleteOpen(false);
+      setUserToDelete(null);
+    } catch (err: any) {
+      // Error is handled by mutation
+    }
+  };
+
+  const handleVerify = async (userId: string) => {
+    try {
+      await verifyUserMutation.mutateAsync(userId);
+    } catch (err: any) {
+      // Error is handled by mutation
+    }
+  };
+
+  const handleViewProfile = (user: User) => {
+    setSelectedUser(user);
+    setProfileOpen(true);
+  };
+
+  const handleActivateUser = async (userId: string) => {
+    try {
+      await activateUserMutation.mutateAsync(userId);
+    } catch (err: any) {
+      // Error is handled by mutation
+    }
+  };
+
+  const handleDeactivateUser = async (userId: string) => {
+    try {
+      await deactivateUserMutation.mutateAsync(userId);
+    } catch (err: any) {
+      // Error is handled by mutation
+    }
+  };
+
+  const handleLockUser = async (userId: string) => {
+    try {
+      await lockUserMutation.mutateAsync(userId);
+    } catch (err: any) {
+      // Error is handled by mutation
+    }
+  };
+
+  const handleUnlockUser = async (userId: string) => {
+    try {
+      await unlockUserMutation.mutateAsync(userId);
+    } catch (err: any) {
+      // Error is handled by mutation
+    }
+  };
+
+  const handleChangeRole = (user: User) => {
+    setUserToChangeRole(user);
+    setNewRole(user.role || "USER");
+    setRoleChangeOpen(true);
+  };
+
+  const confirmChangeRole = async () => {
+    if (!userToChangeRole || !newRole) return;
+
+    try {
+      await changeUserRoleMutation.mutateAsync({
+        userId: userToChangeRole.userId,
+        role: newRole,
+      });
+      setRoleChangeOpen(false);
+      setUserToChangeRole(null);
+    } catch (err: any) {
+      // Error is handled by mutation
+    }
   };
 
   const handleAddAlumni = async (e: React.FormEvent) => {
@@ -99,27 +276,17 @@ export default function UserDirectoryPage() {
       toast.error("All fields are required");
       return;
     }
-    setIsSubmitting(true);
     try {
-      await createUser(addForm);
-      toast.success("Alumni added successfully");
+      await createUserMutation.mutateAsync(addForm);
       setAddForm({ firstName: "", lastName: "", emailAddress: "" });
       setAddOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["users-all"] });
     } catch (err: any) {
-      toast.error(err.message || "Failed to add alumni");
-    } finally {
-      setIsSubmitting(false);
+      // Error is handled by mutation hook
     }
   };
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase();
-  };
-
   const getStatus = (user: User) => {
-    if (user.isVerified) return "Verified";
+    if (user.isVerified) return "Verified Alumni";
     // TODO: Map additional statuses (e.g., isLocked → "Flagged")
     return "Pending";
   };
@@ -178,8 +345,8 @@ export default function UserDirectoryPage() {
                 <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button type="submit" disabled={createUserMutation.isPending}>
+                  {createUserMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Add Alumni
                 </Button>
               </DialogFooter>
@@ -190,9 +357,9 @@ export default function UserDirectoryPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Alumni" value={totalCount} icon={<GraduationCap />} sub="Live count" />
-        <StatCard title="Verified" value={verifiedCount} icon={<ShieldCheck />} sub="Active members" />
-        <StatCard title="Pending" value={pendingCount} icon={<Mail />} sub="Requires action" color="text-orange-500" />
+        <StatCard title="Total Alumni" value={totalCount} icon={<GraduationCap />} sub="Total registered alumni" loading={allUsersLoading} />
+        <StatCard title="Verified Alumni" value={verifiedCount} icon={<ShieldCheck />} sub="Officially verified alumni" loading={allUsersLoading} />
+        <StatCard title="Pending Review" value={pendingCount} icon={<Clock />} sub="Awaiting admin approval" color="text-orange-500" loading={allUsersLoading} />
       </div>
 
       <Card className="overflow-hidden">
@@ -204,14 +371,27 @@ export default function UserDirectoryPage() {
                 placeholder="Search alumni..."
                 className="pl-9"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
               />
             </div>
             <div className="flex items-center gap-2">
-               <Button variant="outline" size="sm" className="hidden sm:flex">
-                 <Filter className="mr-2 h-4 w-4" /> Filter
+               <DropdownMenu>
+                 <DropdownMenuTrigger asChild>
+                   <Button variant="outline" size="sm" className="hidden sm:flex">
+                     <Filter className="mr-2 h-4 w-4" /> 
+                     {statusFilter === "ALL" ? "Filter" : statusFilter === "VERIFIED" ? "Verified" : "Pending"}
+                   </Button>
+                 </DropdownMenuTrigger>
+                 <DropdownMenuContent align="end">
+                   <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => handleStatusFilter("ALL")}>All Alumni</DropdownMenuItem>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => handleStatusFilter("VERIFIED")}>Verified Alumni</DropdownMenuItem>
+                   <DropdownMenuItem className="cursor-pointer" onClick={() => handleStatusFilter("PENDING")}>Pending Approval</DropdownMenuItem>
+                 </DropdownMenuContent>
+               </DropdownMenu>
+               <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                 <FileDown className="mr-2 h-4 w-4" /> Export CSV
                </Button>
-               <Button variant="outline" size="sm">Export CSV</Button>
             </div>
           </div>
         </CardHeader>
@@ -226,13 +406,14 @@ export default function UserDirectoryPage() {
                   {/* TODO: Add "Major" column when API provides major/department */}
                   <TableHead className="hidden lg:table-cell">Major</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Role</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       <div className="flex items-center justify-center gap-2 text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Loading users...
@@ -241,12 +422,12 @@ export default function UserDirectoryPage() {
                   </TableRow>
                 ) : error ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                    <TableCell colSpan={6} className="h-24 text-center text-destructive">
                       Failed to load users. Please try again.
                     </TableCell>
                   </TableRow>
-                ) : filteredUsers.length > 0 ? (
-                  filteredUsers.map((person) => (
+                ) : displayedUsers.length > 0 ? (
+                  displayedUsers.map((person) => (
                     <TableRow key={person.userId} className="hover:bg-muted/30 transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -271,11 +452,14 @@ export default function UserDirectoryPage() {
                       <TableCell className="hidden lg:table-cell text-muted-foreground">—</TableCell>
                       <TableCell>
                         <Badge variant={
-                          getStatus(person) === "Verified" ? "default" :
+                          getStatus(person) === "Verified Alumni" ? "default" :
                           getStatus(person) === "Pending" ? "secondary" : "destructive"
                         } className="text-[10px] sm:text-xs">
                           {getStatus(person)}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium">{person.role || "USER"}</span>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -284,26 +468,65 @@ export default function UserDirectoryPage() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuLabel>Options</DropdownMenuLabel>
-                            <DropdownMenuItem className="cursor-pointer">
-                              <ExternalLink className="mr-2 h-4 w-4" /> View Profile
-                            </DropdownMenuItem>
-                            {!person.isVerified && (
-                              <DropdownMenuItem
-                                className="cursor-pointer text-blue-600"
-                                onClick={() => handleVerify(person.userId)}
-                              >
-                                <ShieldCheck className="mr-2 h-4 w-4" /> Verify
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive cursor-pointer"
-                              onClick={() => handleDelete(person.userId)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
+                           <DropdownMenuContent align="end" className="w-40">
+                             <DropdownMenuLabel>Options</DropdownMenuLabel>
+                             <DropdownMenuItem
+                               className="cursor-pointer"
+                               onClick={() => handleViewProfile(person)}
+                             >
+                               <ExternalLink className="mr-2 h-4 w-4" /> View Profile
+                             </DropdownMenuItem>
+                             {!person.isVerified && (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-blue-600"
+                                 onClick={() => handleVerify(person.userId)}
+                               >
+                                 <ShieldCheck className="mr-2 h-4 w-4" /> Verify
+                               </DropdownMenuItem>
+                             )}
+                             <DropdownMenuItem
+                               className="cursor-pointer"
+                               onClick={() => handleChangeRole(person)}
+                             >
+                               <Settings className="mr-2 h-4 w-4" /> Change Role
+                             </DropdownMenuItem>
+                             {person.isActive ? (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-orange-600"
+                                 onClick={() => handleDeactivateUser(person.userId)}
+                               >
+                                 <UserX className="mr-2 h-4 w-4" /> Deactivate User
+                               </DropdownMenuItem>
+                             ) : (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-green-600"
+                                 onClick={() => handleActivateUser(person.userId)}
+                               >
+                                 <UserCheck className="mr-2 h-4 w-4" /> Activate User
+                               </DropdownMenuItem>
+                             )}
+                             {person.isLocked ? (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-green-600"
+                                 onClick={() => handleUnlockUser(person.userId)}
+                               >
+                                 <Unlock className="mr-2 h-4 w-4" /> Unlock User
+                               </DropdownMenuItem>
+                             ) : (
+                               <DropdownMenuItem
+                                 className="cursor-pointer text-orange-600"
+                                 onClick={() => handleLockUser(person.userId)}
+                               >
+                                 <Lock className="mr-2 h-4 w-4" /> Lock User
+                               </DropdownMenuItem>
+                             )}
+                             <DropdownMenuSeparator />
+                             <DropdownMenuItem
+                               className="text-destructive cursor-pointer"
+                               onClick={() => handleDelete(person)}
+                             >
+                               <Trash2 className="mr-2 h-4 w-4" /> Delete
+                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -321,7 +544,7 @@ export default function UserDirectoryPage() {
           </div>
 
           {/* Pagination - only show when there are multiple pages */}
-          {!isLoading && !error && (page > 1 || hasNextPage) && (
+          {!isLoading && !error && (page > 1 || showNextPage) && (
             <div className="flex items-center justify-end gap-2 py-4 px-2">
               {page > 1 && (
                 <Button
@@ -333,7 +556,7 @@ export default function UserDirectoryPage() {
                 </Button>
               )}
               <span className="text-sm text-muted-foreground">Page {page}</span>
-              {hasNextPage && (
+              {showNextPage && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -346,6 +569,32 @@ export default function UserDirectoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Profile View Dialog */}
+      <ProfileViewDialog
+        user={selectedUser}
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        user={userToDelete}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onConfirm={confirmDelete}
+      />
+
+      {/* Change Role Dialog */}
+      <ChangeRoleDialog
+        user={userToChangeRole}
+        open={roleChangeOpen}
+        onOpenChange={setRoleChangeOpen}
+        newRole={newRole}
+        onRoleChange={setNewRole}
+        onConfirm={confirmChangeRole}
+        isLoading={changeUserRoleMutation.isPending}
+      />
 
       {/*
         TODO: The following API response fields are not yet displayed in the UI:
@@ -362,8 +611,304 @@ export default function UserDirectoryPage() {
   );
 }
 
+// Profile View Dialog Component
+function ProfileViewDialog({ user, open, onOpenChange }: { user: User | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { profile, isLoading, error } = useUserProfile(user?.userId ?? null);
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Not available";
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const renderArrayField = (arr: any[], label: string) => {
+    if (!arr || arr.length === 0) return null;
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-semibold text-muted-foreground uppercase">{label}</p>
+        <div className="flex flex-wrap gap-1">
+          {arr.map((item, idx) => (
+            <Badge key={idx} variant="outline" className="text-xs">
+              {item}
+            </Badge>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  if (!user) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>User Profile</DialogTitle>
+          <DialogDescription>
+            Complete profile details
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="text-sm text-destructive py-4">
+            {error}
+          </div>
+        ) : profile ? (
+          <div className="space-y-6">
+            {/* Header Section */}
+            <div className="flex items-start gap-4 pb-4 border-b">
+              <Avatar className="h-20 w-20 border-2">
+                {profile.profileImagePath ? (
+                  <img src={profile.profileImagePath} alt={`${profile.firstName} ${profile.lastName}`} />
+                ) : (
+                  <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                    {getInitials(profile.firstName, profile.lastName)}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold">{profile.firstName} {profile.lastName}</h2>
+                <p className="text-sm text-muted-foreground mb-2">{profile.email}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={profile.isVerified ? "default" : "secondary"}>
+                    {profile.isVerified ? "✓ Verified" : "Pending"}
+                  </Badge>
+                  <Badge variant={profile.isActive ? "default" : "destructive"}>
+                    {profile.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  {profile.isLocked && <Badge variant="destructive">Locked</Badge>}
+                  <Badge variant="outline">{profile.role}</Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Account Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Member Since</p>
+                <p className="text-sm">{formatDate(profile.createdAt)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Last Login</p>
+                <p className="text-sm">{formatDate(profile.lastLogin)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Cohort</p>
+                <p className="text-sm">{profile.cohort || "Not specified"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Location</p>
+                <p className="text-sm">{profile.location || "Not specified"}</p>
+              </div>
+            </div>
+
+            {/* Professional Info */}
+            {(profile.title || profile.companyName || profile.companyStage || profile.businessModel) && (
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Professional Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {profile.title && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Title</p>
+                      <p className="text-sm">{profile.title}</p>
+                    </div>
+                  )}
+                  {profile.companyName && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Company</p>
+                      <p className="text-sm">{profile.companyName}</p>
+                    </div>
+                  )}
+                  {profile.companyStage && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Company Stage</p>
+                      <p className="text-sm">{profile.companyStage}</p>
+                    </div>
+                  )}
+                  {profile.businessModel && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Business Model</p>
+                      <p className="text-sm">{profile.businessModel}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Skills & Sectors */}
+            {(profile.sector?.length > 0 || profile.skills?.length > 0) && (
+              <div className="border-t pt-4 space-y-3">
+                {renderArrayField(profile.sector, "Sectors")}
+                {renderArrayField(profile.skills, "Skills")}
+              </div>
+            )}
+
+            {/* Bio & Goals */}
+            {(profile.elevatorPitch || profile.goals) && (
+              <div className="border-t pt-4 space-y-3">
+                {profile.elevatorPitch && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Elevator Pitch</p>
+                    <p className="text-sm">{profile.elevatorPitch}</p>
+                  </div>
+                )}
+                {profile.goals && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Goals</p>
+                    <p className="text-sm">{profile.goals}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Needs & Offers */}
+            {(profile.needs?.length > 0 || profile.offers?.length > 0) && (
+              <div className="border-t pt-4 space-y-3">
+                {renderArrayField(profile.needs, "Looking For (Needs)")}
+                {renderArrayField(profile.offers, "What They Offer")}
+              </div>
+            )}
+
+            {/* Social & Contact */}
+            <div className="border-t pt-4 grid grid-cols-2 gap-4">
+              {profile.linkedin && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">LinkedIn</p>
+                  <a href={`https://${profile.linkedin}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all">
+                    {profile.linkedin}
+                  </a>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Contact Visibility</p>
+                <p className="text-sm">{profile.contactVisibility}</p>
+              </div>
+            </div>
+
+            {/* Settings */}
+            <div className="border-t pt-4 bg-muted/30 p-3 rounded">
+              <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">User Settings</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Language: <span className="font-medium">{profile.language}</span></div>
+                <div>Theme: <span className="font-medium">{profile.theme}</span></div>
+                <div>Email Notifications: <span className="font-medium">{profile.emailNotificationsEnabled ? "Enabled" : "Disabled"}</span></div>
+                <div>Onboarded: <span className="font-medium">{profile.isOnboarded ? "Yes" : "No"}</span></div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Delete Confirmation Dialog Component
+function DeleteConfirmationDialog({ user, open, onOpenChange, onConfirm }: {
+  user: User | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-destructive">Delete User</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete {user?.firstName} {user?.lastName}? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
+            Delete User
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Change Role Dialog Component
+function ChangeRoleDialog({
+  user,
+  open,
+  onOpenChange,
+  newRole,
+  onRoleChange,
+  onConfirm,
+  isLoading
+}: {
+  user: User | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  newRole: string;
+  onRoleChange: (role: string) => void;
+  onConfirm: () => void;
+  isLoading: boolean;
+}) {
+  const roles = [
+    { value: "USER", label: "User" },
+    { value: "BACKOFFICE", label: "Back Office" },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Change User Role</DialogTitle>
+          <DialogDescription>
+            Change the role for {user?.firstName} {user?.lastName}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="role">New Role</Label>
+            <Select value={newRole} onValueChange={onRoleChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={isLoading || !newRole}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Change Role
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Reusable Stat Card Component
-function StatCard({ title, value, icon, sub, color = "text-muted-foreground" }: any) {
+function StatCard({ title, value, icon, sub, color = "text-muted-foreground", loading = false }: any) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -371,7 +916,11 @@ function StatCard({ title, value, icon, sub, color = "text-muted-foreground" }: 
         <div className={color}>{React.cloneElement(icon, { size: 16 })}</div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        {loading ? (
+          <Skeleton className="h-8 w-16 mb-1" />
+        ) : (
+          <div className="text-2xl font-bold">{value !== null && value !== undefined ? value : 0}</div>
+        )}
         <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">{sub}</p>
       </CardContent>
     </Card>

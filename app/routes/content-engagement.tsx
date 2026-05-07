@@ -16,11 +16,6 @@ import {
   Lock,
   ImageIcon,
   Loader2,
-  MapPin,
-  Clock,
-  Link as LinkIcon,
-  User,
-  Eye,
 } from "lucide-react";
 import {
   Card,
@@ -67,24 +62,177 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { createEvent } from "@/services/apiEvents";
+import {
+  createEvent,
+  approveEvent,
+  declineEvent,
+  fetchEventById,
+  type BackofficeEvent,
+} from "@/services/apiEvents";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useEvents } from "@/hooks/useEvents";
-import { useEventDetails } from "@/hooks/useEventDetails";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
+import {
+  getPendingPosts,
+  approvePost,
+  rejectPost,
+  getResources,
+  uploadResource,
+  downloadResource,
+  archiveResource,
+  deleteResource,
+  type FeedPost,
+  type Resource,
+} from "@/services/apiContent";
+import {
+  createNewsfeed as createNews,
+  updateNewsfeed as updateNews,
+  deleteNewsfeed as deleteNews,
+  getNewsfeed as getNews,
+  type NewsfeedPost as NewsItem,
+  type CreateNewsfeedPayload as CreateNewsPayload,
+  type UpdateNewsfeedPayload as UpdateNewsPayload,
+} from "@/services/apiNewsfeed";
 
 export default function ContentEngagementPage() {
   const { events, isLoading: eventsLoading } = useEvents();
   const queryClient = useQueryClient();
+
+  // Fetch pending posts
+  const { data: pendingPosts = [], isLoading: postsLoading } = useQuery({
+    queryKey: ['pending-posts'],
+    queryFn: () => getPendingPosts(),
+  });
+
+  // Fetch news
+  const { data: newsItems = [], isLoading: newsItemsLoading } = useQuery({
+    queryKey: ['news'],
+    queryFn: getNews,
+  });
+
+  // Fetch resources
+  const { data: resources = [], isLoading: resourcesLoading } = useQuery({
+    queryKey: ['resources'],
+    queryFn: () => getResources(),
+  });
+
+  // Mutations for posts
+  const approvePostMutation = useMutation({
+    mutationFn: approvePost,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-posts'] });
+      toast.success('Post approved successfully');
+    },
+  });
+
+  const rejectPostMutation = useMutation({
+    mutationFn: rejectPost,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-posts'] });
+      toast.success('Post rejected');
+    },
+  });
+
+  // Mutations for events
+  const approveEventMutation = useMutation({
+    mutationFn: approveEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      toast.success('Event approved successfully');
+    },
+  });
+
+  const declineEventMutation = useMutation({
+    mutationFn: (eventId: string) => declineEvent(eventId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      toast.success('Event declined');
+    },
+  });
+
+  // Mutations for resources
+  const archiveResourceMutation = useMutation({
+    mutationFn: archiveResource,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+      toast.success('Resource archived');
+    },
+  });
+
+  const deleteResourceMutation = useMutation({
+    mutationFn: deleteResource,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+      toast.success('Resource deleted');
+    },
+  });
+
+  const uploadResourceMutation = useMutation({
+    mutationFn: uploadResource,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+      toast.success('Resource uploaded successfully');
+      setResourceDialogOpen(false);
+      setResourceForm({
+        title: "",
+        category: "",
+        description: "",
+        visibility: "All",
+      });
+      if (resourceFileRef.current) resourceFileRef.current.value = "";
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to upload resource");
+    },
+  });
+
+  const downloadResourceMutation = useMutation({
+    mutationFn: ({ resourceId, fallbackUrl }: { resourceId: string; fallbackUrl?: string }) =>
+      downloadResource(resourceId).then((url) => url || fallbackUrl || ""),
+    onSuccess: (url) => {
+      if (!url) {
+        toast.error("No file URL returned for this resource");
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to download resource");
+    },
+  });
+
+  // Mutations for news
+  const updateNewsMutation = useMutation({
+    mutationFn: ({ postId, payload }: { postId: string; payload: UpdateNewsPayload }) =>
+      updateNews(postId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['news'] });
+      toast.success('News updated successfully!');
+      setEditNewsDialogOpen(false);
+      setEditingNewsId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to update news");
+    },
+  });
+
+  const deleteNewsMutation = useMutation({
+    mutationFn: deleteNews,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['news'] });
+      toast.success('News deleted successfully!');
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to delete news");
+    },
+  });
+  
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
+  const [eventStatusFilter, setEventStatusFilter] = useState("all");
+  const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const {
-    event: eventDetail,
-    isLoading: detailLoading,
-  } = useEventDetails(detailDialogOpen ? selectedEventId : null);
   const [eventLoading, setEventLoading] = useState(false);
   const [eventForm, setEventForm] = useState({
     name: "",
@@ -99,6 +247,45 @@ export default function ContentEngagementPage() {
     rsvpLimit: "",
   });
   const coverImageRef = useRef<HTMLInputElement>(null);
+  const newsImagesRef = useRef<HTMLInputElement>(null);
+  const resourceFileRef = useRef<HTMLInputElement>(null);
+
+   // News form state
+   const [newsDialogOpen, setNewsDialogOpen] = useState(false);
+   const [newsForm, setNewsForm] = useState({
+     title: "",
+     category: "",
+     body: "",
+   });
+   const [newsImages, setNewsImages] = useState<File[]>([]);
+   const [newsLoading, setNewsLoading] = useState(false);
+
+   // Post detail modal
+   const [postDialogOpen, setPostDialogOpen] = useState(false);
+   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
+
+   // Edit news modal
+   const [editNewsDialogOpen, setEditNewsDialogOpen] = useState(false);
+   const [editNewsForm, setEditNewsForm] = useState({
+     title: "",
+     category: "",
+     body: "",
+   });
+   const [editNewsImages, setEditNewsImages] = useState<File[]>([]);
+   const [editingNewsId, setEditingNewsId] = useState<string | null>(null);
+
+   // Analytics dialog
+   const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false);
+   const [eventDetailsOpen, setEventDetailsOpen] = useState(false);
+   const [selectedEvent, setSelectedEvent] = useState<BackofficeEvent | null>(null);
+   const [eventDetailsLoading, setEventDetailsLoading] = useState(false);
+   const [resourceDialogOpen, setResourceDialogOpen] = useState(false);
+   const [resourceForm, setResourceForm] = useState({
+     title: "",
+     category: "",
+     description: "",
+     visibility: "All",
+   });
 
   function handleEventChange(field: string, value: string) {
     setEventForm((prev) => ({ ...prev, [field]: value }));
@@ -172,8 +359,118 @@ export default function ContentEngagementPage() {
       setEventLoading(false);
     }
   }
+
+  // News handlers
+  async function handleCreateNews() {
+    if (!newsForm.title.trim()) {
+      toast.error("Please enter a headline.");
+      return;
+    }
+    if (!newsForm.category) {
+      toast.error("Please select a category.");
+      return;
+    }
+    if (!newsForm.body.trim()) {
+      toast.error("Please enter article content.");
+      return;
+    }
+
+    setNewsLoading(true);
+    try {
+      await createNews({
+        title: newsForm.title,
+        body: newsForm.body,
+        category: newsForm.category,
+        postImages: newsImages.length > 0 ? newsImages : undefined,
+      });
+      toast.success("News published successfully!");
+      queryClient.invalidateQueries({ queryKey: ["news"] });
+      setNewsDialogOpen(false);
+      setNewsForm({
+        title: "",
+        category: "",
+        body: "",
+      });
+      setNewsImages([]);
+      if (newsImagesRef.current) newsImagesRef.current.value = "";
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to create news");
+    } finally {
+      setNewsLoading(false);
+    }
+  }
+
+  // Event approval handlers
+  const handleApproveEvent = (eventId: string) => {
+    approveEventMutation.mutate(eventId);
+  };
+
+  const handleDeclineEvent = (eventId: string) => {
+    declineEventMutation.mutate(eventId);
+  };
+
+  const handleViewEventDetails = async (event: BackofficeEvent) => {
+    setSelectedEvent(event);
+    setEventDetailsOpen(true);
+    setEventDetailsLoading(true);
+    try {
+      const response = await fetchEventById(event.eventId);
+      setSelectedEvent(response.data);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load event details");
+    } finally {
+      setEventDetailsLoading(false);
+    }
+  };
+
+  // Resource handlers
+  const handleArchiveResource = (resourceId: string) => {
+    archiveResourceMutation.mutate(resourceId);
+  };
+
+  const handleDeleteResource = (resourceId: string) => {
+    deleteResourceMutation.mutate(resourceId);
+  };
+
+  const handleDownloadResource = (resource: Resource) => {
+    downloadResourceMutation.mutate({
+      resourceId: resource.id,
+      fallbackUrl: resource.resourceFileUrl || resource.filePath,
+    });
+  };
+
+  const handleUploadResource = () => {
+    if (!resourceForm.title.trim()) {
+      toast.error("Please enter a resource title.");
+      return;
+    }
+    if (!resourceForm.category.trim()) {
+      toast.error("Please enter a resource category.");
+      return;
+    }
+    const file = resourceFileRef.current?.files?.[0];
+    if (!file) {
+      toast.error("Please choose a resource file.");
+      return;
+    }
+    uploadResourceMutation.mutate({
+      title: resourceForm.title.trim(),
+      description: resourceForm.description.trim(),
+      category: resourceForm.category.trim(),
+      visibility: resourceForm.visibility,
+      file,
+    });
+  };
+
+  const filteredEvents = events.filter((e) => {
+    if (eventStatusFilter !== "all" && e.eventStatus !== eventStatusFilter) return false;
+    if (eventTypeFilter !== "all" && e.type !== eventTypeFilter) return false;
+    return true;
+  });
+
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+    <>
+      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">
@@ -184,8 +481,8 @@ export default function ContentEngagementPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          {/* BEEFED UP NEWS MODAL */}
-          <Dialog>
+          {/* NEWS MODAL */}
+          <Dialog open={newsDialogOpen} onOpenChange={setNewsDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Newspaper className="h-4 w-4 mr-2" /> Draft News
@@ -201,41 +498,72 @@ export default function ContentEngagementPage() {
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Headline</Label>
-                  <Input placeholder="e.g. New Research Grant Announced" />
+                  <Input
+                    placeholder="e.g. New Research Grant Announced"
+                    value={newsForm.title}
+                    onChange={(e) => setNewsForm(prev => ({ ...prev, title: e.target.value }))}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Category</Label>
-                    <Select>
+                    <Select
+                      value={newsForm.category}
+                      onValueChange={(value) => setNewsForm(prev => ({ ...prev, category: value }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="announcement">
+                        <SelectItem value="Announcement">
                           Announcement
                         </SelectItem>
-                        <SelectItem value="achievement">Achievement</SelectItem>
-                        <SelectItem value="press">Press Release</SelectItem>
+                        <SelectItem value="Industry Update">Industry Update</SelectItem>
+                        <SelectItem value="Spotlight">Spotlight</SelectItem>
+                        <SelectItem value="Event">Event</SelectItem>
+                        <SelectItem value="Opportunity">Opportunity</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Featured Image</Label>
-                    <Button variant="secondary" className="w-full text-xs h-9">
-                      <ImageIcon className="mr-2 h-4 w-4" /> Upload
-                    </Button>
+                    <Label>Post Images (up to 5)</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      ref={newsImagesRef}
+                      className="cursor-pointer text-xs h-9"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []).slice(0, 5);
+                        setNewsImages(files);
+                      }}
+                    />
+                    {newsImages.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {newsImages.length} file(s) selected
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Article Content</Label>
+                  <Label>Post Content</Label>
                   <Textarea
                     className="min-h-[150px]"
                     placeholder="Start writing the story..."
+                    value={newsForm.body}
+                    onChange={(e) => setNewsForm(prev => ({ ...prev, body: e.target.value }))}
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button className="w-full">Publish News Feed</Button>
+                <Button
+                  className="w-full"
+                  onClick={handleCreateNews}
+                  disabled={newsLoading}
+                >
+                  {newsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Publish News Feed
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -400,8 +728,118 @@ export default function ContentEngagementPage() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
-        </div>
+           </Dialog>
+         
+         {/* EDIT NEWS MODAL */}
+         <Dialog open={editNewsDialogOpen} onOpenChange={setEditNewsDialogOpen}>
+           <DialogTrigger asChild>
+             <div className="pointer-events-none" />
+           </DialogTrigger>
+           <DialogContent className="sm:max-w-[500px]">
+             <DialogHeader>
+               <DialogTitle>Edit News Article</DialogTitle>
+               <DialogDescription>
+                 Update the content of this official news article.
+               </DialogDescription>
+             </DialogHeader>
+             <div className="grid gap-4 py-4">
+               <div className="space-y-2">
+                 <Label>Headline</Label>
+                 <Input
+                   placeholder="e.g. New Research Grant Announced"
+                   value={editNewsForm.title}
+                   onChange={(e) => setEditNewsForm(prev => ({ ...prev, title: e.target.value }))}
+                 />
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                   <Label>Category</Label>
+                   <Select
+                     value={editNewsForm.category}
+                     onValueChange={(value) => setEditNewsForm(prev => ({ ...prev, category: value }))}
+                   >
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="Announcement">
+                         Announcement
+                       </SelectItem>
+                       <SelectItem value="Industry Update">Industry Update</SelectItem>
+                       <SelectItem value="Spotlight">Spotlight</SelectItem>
+                       <SelectItem value="Event">Event</SelectItem>
+                       <SelectItem value="Opportunity">Opportunity</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+                 <div className="space-y-2">
+                   <Label>Post Images (up to 5)</Label>
+                   <Input
+                     type="file"
+                     accept="image/*"
+                     multiple
+                     ref={newsImagesRef}
+                     className="cursor-pointer text-xs h-9"
+                     onChange={(e) => {
+                       const files = Array.from(e.target.files || []).slice(0, 5);
+                       setEditNewsImages(files);
+                     }}
+                   />
+                   {editNewsImages.length > 0 && (
+                     <p className="text-xs text-muted-foreground mt-1">
+                       {editNewsImages.length} file(s) selected
+                     </p>
+                   )}
+                 </div>
+               </div>
+               <div className="space-y-2">
+                 <Label>Post Content</Label>
+                 <Textarea
+                   className="min-h-[150px]"
+                   placeholder="Start writing the story..."
+                   value={editNewsForm.body}
+                   onChange={(e) => setEditNewsForm(prev => ({ ...prev, body: e.target.value }))}
+                 />
+               </div>
+             </div>
+             <DialogFooter>
+               <Button
+                 className="w-full"
+                 onClick={async () => {
+                   if (!editNewsForm.title.trim()) {
+                     toast.error("Please enter a headline.");
+                     return;
+                   }
+                   if (!editNewsForm.category) {
+                     toast.error("Please select a category.");
+                     return;
+                   }
+                   if (!editNewsForm.body.trim()) {
+                     toast.error("Please enter article content.");
+                     return;
+                   }
+
+                   if (editingNewsId) {
+                     updateNewsMutation.mutate({
+                       postId: editingNewsId,
+                       payload: {
+                         title: editNewsForm.title,
+                         category: editNewsForm.category,
+                         body: editNewsForm.body,
+                         postImages: editNewsImages.length > 0 ? editNewsImages : undefined,
+                       },
+                     });
+                   }
+                 }}
+                 disabled={updateNewsMutation.isPending}
+               >
+                 {updateNewsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                 Update News
+               </Button>
+             </DialogFooter>
+           </DialogContent>
+         </Dialog>
+       </div>
       </div>
 
       <Tabs defaultValue="feed" className="space-y-4">
@@ -423,125 +861,274 @@ export default function ContentEngagementPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  {
-                    user: "David K.",
-                    content:
-                      "Just landed a role at Google! Thanks to the STP network for the prep...",
-                    status: "Pending",
-                    time: "1h ago",
-                  },
-                  {
-                    user: "Linda M.",
-                    content:
-                      "Anyone interested in a weekend hackathon for Fintech? Looking for partners.",
-                    status: "Flagged",
-                    time: "3h ago",
-                  },
-                ].map((post, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start justify-between p-4 border rounded-lg bg-muted/30"
-                  >
-                    <div className="flex gap-4">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>{post.user[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm">
-                            {post.user}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground uppercase">
-                            {post.time}
-                          </span>
-                          {post.status === "Flagged" && (
-                            <Badge
-                              variant="destructive"
-                              className="h-4 text-[9px]"
-                            >
-                              Flagged
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-snug">
-                          {post.content}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive h-8 w-8"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-green-600 h-8 w-8"
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    </div>
+                {postsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                ) : pendingPosts.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No pending posts to review.
+                  </p>
+                ) : (
+                   pendingPosts.map((post) => (
+                     <div
+                       key={post.id}
+                       className="flex items-start justify-between p-4 border rounded-lg bg-muted/30"
+                       onClick={() => {
+                         setSelectedPost(post);
+                         setPostDialogOpen(true);
+                       }}
+                       style={{ cursor: 'pointer' }}
+                     >
+                   <div className="flex gap-4">
+                     <Avatar className="h-10 w-10">
+                       <AvatarFallback>{post.user[0]}</AvatarFallback>
+                     </Avatar>
+                     <div className="space-y-1">
+                       <div className="flex items-center gap-2">
+                         <span className="font-semibold text-sm">
+                           {post.user}
+                         </span>
+                         <span className="text-[10px] text-muted-foreground uppercase">
+                           {post.time}
+                         </span>
+                         {post.status === "flagged" && (
+                           <Badge
+                             variant="destructive"
+                             className="h-4 text-[9px]"
+                           >
+                             Flagged
+                           </Badge>
+                         )}
+                       </div>
+                       <p className="text-sm text-muted-foreground leading-snug">
+                         {post.content}
+                       </p>
+                     </div>
+                   </div>
+                   <div className="flex gap-2">
+                     <Button
+                       size="icon"
+                       variant="ghost"
+                       className="text-destructive h-8 w-8"
+                       onClick={() => rejectPostMutation.mutate(post.id)}
+                       disabled={rejectPostMutation.isPending}
+                     >
+                       <X className="h-4 w-4" />
+                     </Button>
+                     <Button
+                       size="icon"
+                       variant="ghost"
+                       className="text-green-600 h-8 w-8"
+                       onClick={() => approvePostMutation.mutate(post.id)}
+                       disabled={approvePostMutation.isPending}
+                     >
+                       <Check className="h-4 w-4" />
+                     </Button>
+                   </div>
+                 </div>
+               ))
+             )}
+           </div>
+         </CardContent>
+       </Card>
+       
+       {/* Post Detail Modal */}
+       <Dialog open={postDialogOpen} onOpenChange={setPostDialogOpen}>
+         <DialogTrigger asChild>
+           <div className="pointer-events-none" />
+         </DialogTrigger>
+         <DialogContent className="sm:max-w-[500px]">
+           <DialogHeader>
+             <DialogTitle>Post Details</DialogTitle>
+             <DialogDescription>
+               Review the content before taking action.
+             </DialogDescription>
+           </DialogHeader>
+           <div className="space-y-4">
+             {selectedPost && (
+               <>
+                 <div className="space-y-2">
+                   <Label>Author</Label>
+                   <p className="font-medium">{selectedPost.user}</p>
+                 </div>
+                 <div className="space-y-2">
+                   <Label>Time</Label>
+                   <p className="text-muted-foreground">{selectedPost.time}</p>
+                 </div>
+                 <div className="space-y-2">
+                   <Label>Content</Label>
+                   <p className="text-muted-foreground">{selectedPost.content}</p>
+                 </div>
+                 {selectedPost.status === "flagged" && (
+                   <div className="space-y-2">
+                     <Label>Status</Label>
+                     <Badge variant="destructive">Flagged</Badge>
+                   </div>
+                 )}
+               </>
+             )}
+           </div>
+           <DialogFooter>
+             <Button
+               variant="outline"
+               onClick={() => {
+                 setPostDialogOpen(false);
+               }}
+             >
+               Close
+             </Button>
+             {selectedPost && (
+               <>
+                 <Button
+                   size="icon"
+                   variant="ghost"
+                   className="text-destructive h-8 w-8"
+                   onClick={() => {
+                     rejectPostMutation.mutate(selectedPost.id);
+                     setPostDialogOpen(false);
+                   }}
+                   disabled={rejectPostMutation.isPending}
+                 >
+                   <X className="h-4 w-4" />
+                 </Button>
+                 <Button
+                   size="icon"
+                   variant="ghost"
+                   className="text-green-600 h-8 w-8"
+                   onClick={() => {
+                     approvePostMutation.mutate(selectedPost.id);
+                     setPostDialogOpen(false);
+                   }}
+                   disabled={approvePostMutation.isPending}
+                 >
+                   <Check className="h-4 w-4" />
+                 </Button>
+               </>
+             )}
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+     </TabsContent>
 
         {/* --- OFFICIAL NEWS FEED --- */}
         <TabsContent value="news" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: "Annual Alumni Gala 2026",
-                date: "Feb 15, 2026",
-                views: "1.2k",
-              },
-              {
-                title: "New Resource: Career Transition Guide",
-                date: "Jan 28, 2026",
-                views: "850",
-              },
-              {
-                title: "Campus Development Update",
-                date: "Jan 12, 2026",
-                views: "430",
-              },
-            ].map((news, i) => (
-              <Card key={i}>
-                <CardHeader className="pb-2">
-                  <Badge variant="outline" className="w-fit mb-2">
-                    Official
-                  </Badge>
-                  <CardTitle className="text-base line-clamp-1">
-                    {news.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Published: {news.date}</span>
-                    <span>{news.views} reads</span>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="secondary" size="sm" className="">
-                      Edit
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {newsItemsLoading ? (
+              <div className="flex items-center justify-center py-12 col-span-full">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : newsItems.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8 col-span-full">
+                No news articles published yet.
+              </p>
+            ) : (
+              newsItems.map((news) => (
+                <Card key={news.id}>
+                  <CardHeader className="pb-2">
+                    <Badge variant="outline" className="w-fit mb-2">
+                      Official
+                    </Badge>
+                    <CardTitle className="text-base line-clamp-1">
+                      {news.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Published: {format(new Date(news.publishedAt), "MMM dd, yyyy")}</span>
+                      <span>{news.views.toLocaleString()} reads</span>
+                    </div>
+                     <div className="mt-4 flex gap-2">
+                       <Button variant="secondary" size="sm" className=""
+                         onClick={() => {
+                           setEditNewsForm({
+                             title: news.title,
+                             category: news.category,
+                             body: news.content,
+                           });
+                           setEditNewsImages([]);
+                           if (newsImagesRef.current) newsImagesRef.current.value = "";
+                           setEditingNewsId(news.id);
+                           setEditNewsDialogOpen(true);
+                         }}
+                       >
+                         Edit
+                       </Button>
+                       <DropdownMenu>
+                         <DropdownMenuTrigger asChild>
+                           <Button variant="ghost" size="icon" className="h-8">
+                             <MoreVertical className="h-4 w-4" />
+                           </Button>
+                         </DropdownMenuTrigger>
+                         <DropdownMenuContent align="end">
+                           <DropdownMenuItem className="cursor-pointer"
+                             onClick={() => {
+                               setEditNewsForm({
+                                 title: news.title,
+                                 category: news.category,
+                                 body: news.content,
+                               });
+                               setEditNewsImages([]);
+                               if (newsImagesRef.current) newsImagesRef.current.value = "";
+                               setEditingNewsId(news.id);
+                               setEditNewsDialogOpen(true);
+                             }}
+                           >
+                             Edit
+                           </DropdownMenuItem>
+                           <DropdownMenuItem
+                             className="text-destructive cursor-pointer"
+                             onClick={() => {
+                               deleteNewsMutation.mutate(news.id);
+                             }}
+                             disabled={deleteNewsMutation.isPending}
+                           >
+                             Delete
+                           </DropdownMenuItem>
+                         </DropdownMenuContent>
+                       </DropdownMenu>
+                     </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </TabsContent>
         {/* --- EVENTS: Grid & Calendar View --- */}
         <TabsContent value="events" className="space-y-4">
-          <div className="flex justify-end mb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <div className="flex flex-wrap items-center gap-2 border rounded-md p-1 bg-muted/50 w-full sm:w-auto">
+              <Select value={eventStatusFilter} onValueChange={setEventStatusFilter}>
+                <SelectTrigger className="h-8 border-0 bg-transparent shadow-none focus:ring-0 w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
+                <SelectTrigger className="h-8 border-0 bg-transparent shadow-none focus:ring-0 w-[120px]">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="physical">Physical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex flex-1 items-center justify-center gap-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                <span className="w-3 h-3 rounded-full bg-blue-500"></span> Approved
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                <span className="w-3 h-3 rounded-full bg-amber-500"></span> Pending
+              </div>
+            </div>
+
             <div className="inline-flex border rounded-md p-1 bg-muted">
               <Button
                 variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -566,40 +1153,72 @@ export default function ContentEngagementPage() {
             </div>
           ) : viewMode === "grid" ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {events.length === 0 ? (
+              {filteredEvents.length === 0 ? (
                 <p className="text-muted-foreground col-span-full text-center py-8">
-                  No events yet. Create one to get started.
+                  No events found.
                 </p>
               ) : (
-                events.map((event) => (
-                  <Card
-                    key={event.eventId}
-                    className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-                    onClick={() => {
-                      setSelectedEventId(event.eventId);
-                      setDetailDialogOpen(true);
-                    }}
-                  >
-                    {event.coverImageUrl ? (
-                      <img
-                        src={event.coverImageUrl}
-                        alt={event.name}
-                        className="h-32 w-full object-cover rounded-t-lg"
-                      />
-                    ) : (
-                      <div className="h-32 bg-slate-200 rounded-t-lg animate-pulse" />
-                    )}
-                    <CardHeader className="p-4">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">
-                          {event.name}
-                        </CardTitle>
-                        <Eye className="h-4 w-4 text-muted-foreground" />
+                filteredEvents.map((event) => (
+                  <Card key={event.eventId} className="overflow-hidden">
+                    <div className="relative">
+                      {event.coverImageUrl ? (
+                        <img
+                          src={event.coverImageUrl}
+                          alt={event.name}
+                          className="h-32 w-full object-cover rounded-t-lg"
+                        />
+                      ) : (
+                        <div className="h-32 bg-slate-200 rounded-t-lg flex items-center justify-center">
+                          <CalendarIcon className="h-8 w-8 text-slate-400" />
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2">
+                        <Badge 
+                          variant={event.eventStatus === 'pending' ? "secondary" : "default"}
+                          className={event.eventStatus === 'pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200' : 'bg-green-100 text-green-800 hover:bg-green-100 border-green-200'}
+                        >
+                          {event.eventStatus === 'pending' ? 'Pending Validation' : 'Approved'}
+                        </Badge>
                       </div>
-                      <CardDescription>
+                    </div>
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-base line-clamp-1">
+                        {event.name}
+                      </CardTitle>
+                      <CardDescription className="line-clamp-1">
                         {format(new Date(event.startTime), "MMM dd")}
                         {event.address ? ` • ${event.address}` : event.venue ? ` • ${event.venue}` : ""}
                       </CardDescription>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 w-full"
+                        onClick={() => handleViewEventDetails(event)}
+                      >
+                        View Details
+                      </Button>
+                      {event.eventStatus === 'pending' && (
+                         <div className="pt-2 flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 border-green-200 hover:bg-green-50 text-green-700"
+                              onClick={() => handleApproveEvent(event.eventId)}
+                              disabled={approveEventMutation.isPending}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 border-red-200 hover:bg-red-50 text-red-700"
+                              onClick={() => handleDeclineEvent(event.eventId)}
+                              disabled={declineEventMutation.isPending}
+                            >
+                              Decline
+                            </Button>
+                         </div>
+                      )}
                     </CardHeader>
                   </Card>
                 ))
@@ -660,25 +1279,99 @@ export default function ContentEngagementPage() {
                   }
 
                   for (let day = 1; day <= daysInMonth; day++) {
-                    const dayEvents = events.filter((e) => {
+                    const currentDayDate = new Date(year, month, day);
+                    const dayEvents = filteredEvents.filter((e) => {
                       const d = new Date(e.startTime);
                       return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
                     });
                     cells.push(
-                      <div key={day} className="bg-background min-h-[80px] p-2 border-t">
-                        <span className="text-xs">{day}</span>
+                      <div 
+                        key={day} 
+                        className="bg-background min-h-[80px] p-2 border-t hover:bg-muted/10 cursor-pointer transition-colors relative"
+                        onClick={() => {
+                          setEventForm(prev => ({ ...prev, date: currentDayDate }));
+                          setEventDialogOpen(true);
+                        }}
+                      >
+                        <span className="text-xs text-muted-foreground">{day}</span>
                         {dayEvents.map((e) => (
-                          <div
-                            key={e.eventId}
-                            className="mt-1 p-1 bg-blue-100 text-blue-700 text-[10px] rounded truncate cursor-pointer hover:bg-blue-200 transition-colors"
-                            title={e.name}
-                            onClick={() => {
-                              setSelectedEventId(e.eventId);
-                              setDetailDialogOpen(true);
-                            }}
-                          >
-                            {e.name}
-                          </div>
+                          <Popover key={e.eventId}>
+                            <PopoverTrigger asChild>
+                              <div
+                                onClick={(ev) => ev.stopPropagation()}
+                                className={`mt-1 p-1 text-[10px] rounded truncate cursor-pointer hover:opacity-80 transition-opacity ${
+                                  e.eventStatus === 'pending'
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}
+                                title={e.name}
+                              >
+                                {e.eventStatus === 'pending' ? '⏳ ' : ''}{e.name}
+                              </div>
+                            </PopoverTrigger>
+                            <PopoverContent 
+                              align="start" 
+                              className="w-[300px] p-0 overflow-hidden" 
+                              onClick={(ev) => ev.stopPropagation()}
+                            >
+                              {e.coverImageUrl ? (
+                                <img src={e.coverImageUrl} className="w-full h-32 object-cover" alt="cover" />
+                              ) : (
+                                <div className="w-full h-24 bg-slate-100 flex items-center justify-center">
+                                  <CalendarIcon className="h-8 w-8 text-slate-300" />
+                                </div>
+                              )}
+                              <div className="p-4 space-y-3">
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <Badge variant={e.eventStatus === 'pending' ? "secondary" : "default"} className={e.eventStatus === 'pending' ? 'bg-amber-100 text-amber-800 hover:bg-amber-100' : ''}>
+                                      {e.eventStatus === 'pending' ? 'Pending' : 'Approved'}
+                                    </Badge>
+                                    <span className="text-[10px] text-muted-foreground uppercase">{format(new Date(e.startTime), 'h:mm a')}</span>
+                                  </div>
+                                  <h4 className="font-bold leading-tight mt-2">{e.name}</h4>
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{e.description || "No description provided."}</p>
+                                </div>
+                                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                  {e.type === 'online' ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                                  {e.address || e.venue || (e.type === 'online' ? "Online Event" : "No location set")}
+                                </div>
+                                <div className="pt-3 flex gap-2 border-t mt-3">
+                                  {e.eventStatus === 'pending' ? (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 border-green-200 hover:bg-green-50 text-green-700"
+                                        onClick={() => handleApproveEvent(e.eventId)}
+                                        disabled={approveEventMutation.isPending}
+                                      >
+                                        Approve
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 border-red-200 hover:bg-red-50 text-red-700"
+                                        onClick={() => handleDeclineEvent(e.eventId)}
+                                        disabled={declineEventMutation.isPending}
+                                      >
+                                        Decline
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="w-full"
+                                      onClick={() => handleViewEventDetails(e)}
+                                    >
+                                      View Details
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         ))}
                       </div>
                     );
@@ -693,12 +1386,21 @@ export default function ContentEngagementPage() {
         {/* --- RESOURCE LIBRARY --- */}
         <TabsContent value="resources" className="space-y-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle>Resource Performance</CardTitle>
-              <Button size="sm" variant="outline">
-                <Download className="h-4 w-4 mr-2" /> Analytics
-              </Button>
-            </CardHeader>
+             <CardHeader className="flex flex-row items-center justify-between pb-2">
+               <CardTitle>Resource Performance</CardTitle>
+               <div className="flex gap-2">
+                 <Button size="sm" onClick={() => setResourceDialogOpen(true)}>
+                   <Plus className="h-4 w-4 mr-2" /> Upload Resource
+                 </Button>
+                 <Button size="sm" variant="outline"
+                   onClick={() => {
+                     setAnalyticsDialogOpen(true);
+                   }}
+                 >
+                   <Download className="h-4 w-4 mr-2" /> Analytics
+                 </Button>
+               </div>
+             </CardHeader>
             <CardContent className="p-0">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b">
@@ -721,213 +1423,284 @@ export default function ContentEngagementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    {
-                      name: "Alumni_Business_Directory_2026.pdf",
-                      cat: "Business",
-                      vis: "Verified",
-                      dls: "1,240",
-                    },
-                    {
-                      name: "VC_Pitch_Deck_Master_Template.pptx",
-                      cat: "Investment",
-                      vis: "Verified",
-                      dls: "458",
-                    },
-                    {
-                      name: "Code_of_Conduct_v2.docx",
-                      cat: "Compliance",
-                      vis: "All",
-                      dls: "2.1k",
-                    },
-                    {
-                      name: "Grant_Proposal_Structure.pdf",
-                      cat: "Funding",
-                      vis: "Verified",
-                      dls: "112",
-                    },
-                  ].map((file, i) => (
-                    <tr
-                      key={i}
-                      className="border-b last:border-0 hover:bg-muted/10 transition-colors"
-                    >
-                      <td className="p-4 flex items-center gap-3 font-medium">
-                        <div className="p-2 bg-blue-100 rounded-md">
-                          <FileBox className="h-4 w-4 text-blue-600" />
+                  {resourcesLoading ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center">
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
-                        {file.name}
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="outline" className="text-[10px]">
-                          {file.cat}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {file.vis === "All" ? (
-                            <Globe className="h-3 w-3" />
-                          ) : (
-                            <Lock className="h-3 w-3" />
-                          )}
-                          {file.vis}
-                        </div>
-                      </td>
-                      <td className="p-4 text-center font-bold text-blue-600 font-mono">
-                        {file.dls}
-                      </td>
-                      <td className="p-4 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="cursor-pointer">
-                              Edit Metadata
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
-                              Archive Asset
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </td>
                     </tr>
-                  ))}
+                  ) : resources.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        No resources found.
+                      </td>
+                    </tr>
+                  ) : (
+                    resources.map((resource) => (
+                      <tr
+                        key={resource.id}
+                        className="border-b last:border-0 hover:bg-muted/10 transition-colors"
+                      >
+                        <td className="p-4 flex items-center gap-3 font-medium">
+                          <div className="p-2 bg-blue-100 rounded-md">
+                            <FileBox className="h-4 w-4 text-blue-600" />
+                          </div>
+                          {resource.name}
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline" className="text-[10px]">
+                            {resource.category}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {resource.visibility === "All" ? (
+                              <Globe className="h-3 w-3" />
+                            ) : (
+                              <Lock className="h-3 w-3" />
+                            )}
+                            {resource.visibility}
+                          </div>
+                        </td>
+                        <td className="p-4 text-center font-bold text-blue-600 font-mono">
+                          {resource.downloads}
+                        </td>
+                        <td className="p-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => handleDownloadResource(resource)}
+                                disabled={downloadResourceMutation.isPending}
+                              >
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="cursor-pointer">
+                                Edit Metadata
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => handleArchiveResource(resource.id)}
+                                disabled={archiveResourceMutation.isPending}
+                              >
+                                Archive Asset
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive cursor-pointer"
+                                onClick={() => handleDeleteResource(resource.id)}
+                                disabled={deleteResourceMutation.isPending}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+       </Tabs>
+     </div>
 
-      {/* EVENT DETAILS DIALOG */}
-      <Dialog
-        open={detailDialogOpen}
-        onOpenChange={(open) => {
-          setDetailDialogOpen(open);
-          if (!open) setSelectedEventId(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-[480px] h-[90vh] overflow-y-auto overflow-x-hidden p-5 scrollbar-hide">
-          {detailLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : eventDetail ? (
-            <div className="overflow-hidden min-w-0">
-              <DialogHeader className="pb-1">
-                <DialogTitle className="text-lg">
-                  {eventDetail.name}
-                </DialogTitle>
-                <DialogDescription>
-                  <Badge variant="outline" className="capitalize text-xs px-2 py-0.5">
-                    {eventDetail.type}
-                  </Badge>
-                </DialogDescription>
-              </DialogHeader>
+     <Dialog open={eventDetailsOpen} onOpenChange={setEventDetailsOpen}>
+       <DialogContent className="sm:max-w-[650px]">
+         <DialogHeader>
+           <DialogTitle>{selectedEvent?.name || "Event Details"}</DialogTitle>
+           <DialogDescription>
+             {eventDetailsLoading ? "Loading event details..." : "Review event information and status."}
+           </DialogDescription>
+         </DialogHeader>
+         {selectedEvent && (
+           <div className="space-y-4">
+             {selectedEvent.coverImageUrl ? (
+               <img
+                 src={selectedEvent.coverImageUrl}
+                 alt={selectedEvent.name}
+                 className="h-48 w-full rounded-md object-cover"
+               />
+             ) : null}
+             <div className="grid gap-4 md:grid-cols-2">
+               <DetailItem label="Status" value={selectedEvent.eventStatus || "approved"} />
+               <DetailItem label="Type" value={selectedEvent.type || "-"} />
+               <DetailItem
+                 label="Starts"
+                 value={selectedEvent.startTime ? format(new Date(selectedEvent.startTime), "PPP p") : "-"}
+               />
+               <DetailItem
+                 label="Ends"
+                 value={selectedEvent.endTime ? format(new Date(selectedEvent.endTime), "PPP p") : "-"}
+               />
+               <DetailItem
+                 label="Location"
+                 value={selectedEvent.address || selectedEvent.venue || selectedEvent.externalLink || "-"}
+               />
+               <DetailItem label="Time Zone" value={selectedEvent.timeZone || "-"} />
+             </div>
+             <div>
+               <p className="text-xs font-semibold uppercase text-muted-foreground">Description</p>
+               <p className="mt-1 text-sm">{selectedEvent.description || "No description provided."}</p>
+             </div>
+           </div>
+         )}
+         <DialogFooter>
+           {selectedEvent?.eventStatus === "pending" ? (
+             <>
+               <Button
+                 variant="outline"
+                 className="border-red-200 text-red-700 hover:bg-red-50"
+                 onClick={() => handleDeclineEvent(selectedEvent.eventId)}
+                 disabled={declineEventMutation.isPending}
+               >
+                 Decline
+               </Button>
+               <Button
+                 variant="outline"
+                 className="border-green-200 text-green-700 hover:bg-green-50"
+                 onClick={() => handleApproveEvent(selectedEvent.eventId)}
+                 disabled={approveEventMutation.isPending}
+               >
+                 Approve
+               </Button>
+             </>
+           ) : null}
+           <Button variant="outline" onClick={() => setEventDetailsOpen(false)}>
+             Close
+           </Button>
+         </DialogFooter>
+       </DialogContent>
+     </Dialog>
 
-              {eventDetail.coverImageUrl && (
-                <div className="mt-3 rounded-lg overflow-hidden">
-                  <img
-                    src={eventDetail.coverImageUrl}
-                    alt={eventDetail.name}
-                    className="w-full h-72 object-cover"
-                  />
-                </div>
-              )}
+     <Dialog open={resourceDialogOpen} onOpenChange={setResourceDialogOpen}>
+       <DialogContent className="sm:max-w-[520px]">
+         <DialogHeader>
+           <DialogTitle>Upload Resource</DialogTitle>
+           <DialogDescription>Add a resource to the alumni library.</DialogDescription>
+         </DialogHeader>
+         <div className="space-y-4">
+           <div className="space-y-2">
+             <Label>Title</Label>
+             <Input
+               value={resourceForm.title}
+               onChange={(event) =>
+                 setResourceForm((prev) => ({ ...prev, title: event.target.value }))
+               }
+               disabled={uploadResourceMutation.isPending}
+             />
+           </div>
+           <div className="space-y-2">
+             <Label>Category</Label>
+             <Input
+               value={resourceForm.category}
+               onChange={(event) =>
+                 setResourceForm((prev) => ({ ...prev, category: event.target.value }))
+               }
+               disabled={uploadResourceMutation.isPending}
+             />
+           </div>
+           <div className="space-y-2">
+             <Label>Description</Label>
+             <Textarea
+               value={resourceForm.description}
+               onChange={(event) =>
+                 setResourceForm((prev) => ({ ...prev, description: event.target.value }))
+               }
+               disabled={uploadResourceMutation.isPending}
+             />
+           </div>
+           <div className="space-y-2">
+             <Label>Visibility</Label>
+             <Select
+               value={resourceForm.visibility}
+               onValueChange={(value) =>
+                 setResourceForm((prev) => ({ ...prev, visibility: value }))
+               }
+               disabled={uploadResourceMutation.isPending}
+             >
+               <SelectTrigger>
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="All">All</SelectItem>
+                 <SelectItem value="Verified">Verified</SelectItem>
+               </SelectContent>
+             </Select>
+           </div>
+           <div className="space-y-2">
+             <Label>File</Label>
+             <Input
+               ref={resourceFileRef}
+               type="file"
+               disabled={uploadResourceMutation.isPending}
+             />
+           </div>
+         </div>
+         <DialogFooter>
+           <Button
+             variant="outline"
+             onClick={() => setResourceDialogOpen(false)}
+             disabled={uploadResourceMutation.isPending}
+           >
+             Cancel
+           </Button>
+           <Button onClick={handleUploadResource} disabled={uploadResourceMutation.isPending}>
+             {uploadResourceMutation.isPending ? "Uploading..." : "Upload Resource"}
+           </Button>
+         </DialogFooter>
+       </DialogContent>
+     </Dialog>
+     
+     {/* ANALYTICS DIALOG */}
+     <Dialog open={analyticsDialogOpen} onOpenChange={setAnalyticsDialogOpen}>
+       <DialogTrigger asChild>
+         <div className="pointer-events-none" />
+       </DialogTrigger>
+       <DialogContent className="sm:max-w-[600px]">
+         <DialogHeader>
+           <DialogTitle>Resource Analytics</DialogTitle>
+           <DialogDescription>
+             View download statistics and engagement metrics for resources.
+           </DialogDescription>
+         </DialogHeader>
+         <div className="space-y-6">
+           {/* Placeholder for analytics content */}
+           <div className="text-center py-12">
+             <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mx-auto mb-4" />
+             <p className="text-muted-foreground">Loading analytics data...</p>
+           </div>
+         </div>
+         <DialogFooter>
+           <Button
+             variant="outline"
+             onClick={() => {
+               setAnalyticsDialogOpen(false);
+             }}
+           >
+             Close
+           </Button>
+         </DialogFooter>
+       </DialogContent>
+     </Dialog>
+     </>
+   );
+ }
 
-              <div className="space-y-3 pt-3 min-w-0">
-                <div className="flex items-start gap-2.5">
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Date & Time</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(eventDetail.startTime), "EEEE, MMMM dd, yyyy")}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(eventDetail.startTime), "hh:mm a")}
-                      {eventDetail.endTime &&
-                        eventDetail.endTime !== eventDetail.startTime &&
-                        ` — ${format(new Date(eventDetail.endTime), "hh:mm a")}`}
-                      {eventDetail.timeZone && ` (${eventDetail.timeZone})`}
-                    </p>
-                  </div>
-                </div>
-
-                {(eventDetail.address || eventDetail.venue || eventDetail.externalLink) && (
-                  <div className="flex items-start gap-2.5">
-                    {eventDetail.type === "online" ? (
-                      <LinkIcon className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                    ) : (
-                      <MapPin className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">
-                        {eventDetail.type === "online" ? "Meeting Link" : "Location"}
-                      </p>
-                      {eventDetail.address && (
-                        <p className="text-sm text-muted-foreground">{eventDetail.address}</p>
-                      )}
-                      {eventDetail.venue && (
-                        <p className="text-sm text-muted-foreground">{eventDetail.venue}</p>
-                      )}
-                      {eventDetail.externalLink && (
-                        <a
-                          href={eventDetail.externalLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline break-all"
-                        >
-                          {eventDetail.externalLink}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {eventDetail.description && (
-                  <div className="flex items-start gap-2.5">
-                    <FileBox className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">Description</p>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {eventDetail.description}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-2.5">
-                  <User className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Created By</p>
-                    <p className="text-sm text-muted-foreground">{eventDetail.createdBy}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <Clock className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Created</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(eventDetail.createdAt), "MMM dd, yyyy 'at' hh:mm a")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="py-6 text-center text-xs text-muted-foreground">
-              Event not found.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm">{value}</p>
     </div>
   );
 }
