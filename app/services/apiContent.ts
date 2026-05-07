@@ -22,6 +22,15 @@ export interface Resource {
   visibility: string;
   downloads: string;
   status: "active" | "archived";
+  resourceFileUrl?: string;
+}
+
+export interface UploadResourcePayload {
+  title: string;
+  description?: string;
+  category: string;
+  visibility?: string;
+  file: File;
 }
 
 type ModerationAction = "approve" | "reject";
@@ -66,7 +75,12 @@ function normalizeResource(resource: any): Resource {
     name: resource?.title ?? resource?.name ?? "Untitled Resource",
     description: resource?.description ?? "",
     category: resource?.category ?? "General",
-    filePath: resource?.resourceFilePath ?? resource?.filePath ?? "",
+    filePath:
+      resource?.resourceFileUrl ??
+      resource?.resourceFilePath ??
+      resource?.fileUrl ??
+      resource?.filePath ??
+      "",
     createdAt: resource?.createdAt ?? "",
     uploaderFirstName: resource?.firstName ?? null,
     uploaderLastName: resource?.lastName ?? null,
@@ -74,6 +88,12 @@ function normalizeResource(resource: any): Resource {
     visibility: resource?.visibility || (resource?.email ? "Verified" : "All"),
     downloads: String(resource?.downloads ?? 0),
     status: String(resource?.status).toLowerCase() === "archived" ? "archived" : "active",
+    resourceFileUrl:
+      resource?.resourceFileUrl ??
+      resource?.resourceFilePath ??
+      resource?.fileUrl ??
+      resource?.filePath ??
+      "",
   };
 }
 
@@ -133,6 +153,41 @@ export async function getResources(opts: {
       : [];
 
   return rows.map(normalizeResource);
+}
+
+export async function uploadResource(
+  payload: UploadResourcePayload
+): Promise<Resource> {
+  const formData = new FormData();
+  formData.append("title", payload.title);
+  formData.append("name", payload.title);
+  formData.append("description", payload.description ?? "");
+  formData.append("category", payload.category);
+  if (payload.visibility) formData.append("visibility", payload.visibility);
+  formData.append("resourceFile", payload.file);
+  formData.append("file", payload.file);
+
+  const result = await apiRequest<any>(API_ENDPOINTS.resources.list, {
+    method: "POST",
+    body: formData,
+  });
+
+  return normalizeResource(result?.data ?? result);
+}
+
+export async function downloadResource(resourceId: string): Promise<string> {
+  const result = await apiRequest<any>(API_ENDPOINTS.resources.download(resourceId), {
+    method: "POST",
+  });
+
+  const data = result?.data ?? result ?? {};
+  return (
+    data?.resourceFileUrl ??
+    data?.resourceFilePath ??
+    data?.fileUrl ??
+    data?.filePath ??
+    ""
+  );
 }
 
 export async function archiveResource(resourceId: string): Promise<void> {

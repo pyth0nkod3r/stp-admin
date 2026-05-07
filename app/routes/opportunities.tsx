@@ -46,6 +46,15 @@ type DealRoom = {
 };
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
   CreateOpportunityModal,
   EditOpportunityModal,
   ViewDetailsModal,
@@ -65,8 +74,10 @@ export default function OpportunitiesPage() {
     updateMutation,
     deleteMutation,
     addMembersMutation,
+    removeMemberMutation,
     approveMutation,
     rejectMutation,
+    fetchRoomDetail,
   } = useDealRooms();
   const [selectedTab, setSelectedTab] = useState("active");
 
@@ -76,6 +87,8 @@ export default function OpportunitiesPage() {
   const [viewDetailsModalOpen, setViewDetailsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [manageMembersModalOpen, setManageMembersModalOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   
   const [selectedRoom, setSelectedRoom] = useState<DealRoom | undefined>(undefined);
 
@@ -108,9 +121,15 @@ export default function OpportunitiesPage() {
     }
   };
 
-  const handleViewDetails = (room: DealRoom) => {
+  const handleViewDetails = async (room: DealRoom) => {
     setSelectedRoom(room);
     setViewDetailsModalOpen(true);
+    try {
+      const detail = await fetchRoomDetail(room.roomId);
+      setSelectedRoom(detail);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load opportunity details");
+    }
   };
 
   const handleDeleteClick = (room: DealRoom) => {
@@ -144,9 +163,29 @@ export default function OpportunitiesPage() {
     await approveMutation.mutateAsync(roomId);
   };
 
-  const handleRejectOpportunity = async (roomId: string) => {
-    const reason = window.prompt("Reason for rejecting this opportunity");
-    await rejectMutation.mutateAsync({ roomId, reason: reason?.trim() || undefined });
+  const handleRejectClick = (room: DealRoom) => {
+    setSelectedRoom(room);
+    setRejectReason("");
+    setRejectModalOpen(true);
+  };
+
+  const handleRejectOpportunity = async () => {
+    if (!selectedRoom) return;
+    await rejectMutation.mutateAsync({
+      roomId: selectedRoom.roomId,
+      reason: rejectReason.trim() || undefined,
+    });
+    setRejectModalOpen(false);
+    setRejectReason("");
+    setSelectedRoom(undefined);
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!selectedRoom) return;
+    await removeMemberMutation.mutateAsync({
+      roomId: selectedRoom.roomId,
+      userId,
+    });
   };
 
   const activeRooms = dealRooms.filter(room => room.isActive === "1");
@@ -284,7 +323,7 @@ export default function OpportunitiesPage() {
                     onDelete={() => handleDeleteClick(room)}
                     onManageMembers={() => handleManageMembersClick(room)}
                     onApprove={() => handleApproveOpportunity(room.roomId)}
-                    onReject={() => handleRejectOpportunity(room.roomId)}
+                    onReject={() => handleRejectClick(room)}
                     isModerating={approveMutation.isPending || rejectMutation.isPending}
                   />
                 ))
@@ -334,9 +373,42 @@ export default function OpportunitiesPage() {
         onClose={() => setManageMembersModalOpen(false)}
         room={selectedRoom}
         onAddMembers={handleAddMembers}
-        onRemoveMember={async () => {}}
-        isLoading={addMembersMutation.isPending}
+        onRemoveMember={handleRemoveMember}
+        isLoading={addMembersMutation.isPending || removeMemberMutation.isPending}
       />
+
+      <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Opportunity</DialogTitle>
+            <DialogDescription>
+              Add an optional reason for rejecting {selectedRoom?.roomName || "this opportunity"}.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="Reason for rejection..."
+            disabled={rejectMutation.isPending}
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRejectModalOpen(false)}
+              disabled={rejectMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectOpportunity}
+              disabled={rejectMutation.isPending}
+            >
+              {rejectMutation.isPending ? "Rejecting..." : "Reject Opportunity"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

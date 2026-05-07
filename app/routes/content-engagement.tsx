@@ -62,7 +62,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { createEvent, approveEvent, declineEvent } from "@/services/apiEvents";
+import {
+  createEvent,
+  approveEvent,
+  declineEvent,
+  fetchEventById,
+  type BackofficeEvent,
+} from "@/services/apiEvents";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useEvents } from "@/hooks/useEvents";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
@@ -71,6 +77,8 @@ import {
   approvePost,
   rejectPost,
   getResources,
+  uploadResource,
+  downloadResource,
   archiveResource,
   deleteResource,
   type FeedPost,
@@ -159,6 +167,41 @@ export default function ContentEngagementPage() {
     },
   });
 
+  const uploadResourceMutation = useMutation({
+    mutationFn: uploadResource,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+      toast.success('Resource uploaded successfully');
+      setResourceDialogOpen(false);
+      setResourceForm({
+        title: "",
+        category: "",
+        description: "",
+        visibility: "All",
+      });
+      if (resourceFileRef.current) resourceFileRef.current.value = "";
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to upload resource");
+    },
+  });
+
+  const downloadResourceMutation = useMutation({
+    mutationFn: ({ resourceId, fallbackUrl }: { resourceId: string; fallbackUrl?: string }) =>
+      downloadResource(resourceId).then((url) => url || fallbackUrl || ""),
+    onSuccess: (url) => {
+      if (!url) {
+        toast.error("No file URL returned for this resource");
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to download resource");
+    },
+  });
+
   // Mutations for news
   const updateNewsMutation = useMutation({
     mutationFn: ({ postId, payload }: { postId: string; payload: UpdateNewsPayload }) =>
@@ -205,6 +248,7 @@ export default function ContentEngagementPage() {
   });
   const coverImageRef = useRef<HTMLInputElement>(null);
   const newsImagesRef = useRef<HTMLInputElement>(null);
+  const resourceFileRef = useRef<HTMLInputElement>(null);
 
    // News form state
    const [newsDialogOpen, setNewsDialogOpen] = useState(false);
@@ -232,6 +276,16 @@ export default function ContentEngagementPage() {
 
    // Analytics dialog
    const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false);
+   const [eventDetailsOpen, setEventDetailsOpen] = useState(false);
+   const [selectedEvent, setSelectedEvent] = useState<BackofficeEvent | null>(null);
+   const [eventDetailsLoading, setEventDetailsLoading] = useState(false);
+   const [resourceDialogOpen, setResourceDialogOpen] = useState(false);
+   const [resourceForm, setResourceForm] = useState({
+     title: "",
+     category: "",
+     description: "",
+     visibility: "All",
+   });
 
   function handleEventChange(field: string, value: string) {
     setEventForm((prev) => ({ ...prev, [field]: value }));
@@ -355,6 +409,20 @@ export default function ContentEngagementPage() {
     declineEventMutation.mutate(eventId);
   };
 
+  const handleViewEventDetails = async (event: BackofficeEvent) => {
+    setSelectedEvent(event);
+    setEventDetailsOpen(true);
+    setEventDetailsLoading(true);
+    try {
+      const response = await fetchEventById(event.eventId);
+      setSelectedEvent(response.data);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to load event details");
+    } finally {
+      setEventDetailsLoading(false);
+    }
+  };
+
   // Resource handlers
   const handleArchiveResource = (resourceId: string) => {
     archiveResourceMutation.mutate(resourceId);
@@ -362,6 +430,36 @@ export default function ContentEngagementPage() {
 
   const handleDeleteResource = (resourceId: string) => {
     deleteResourceMutation.mutate(resourceId);
+  };
+
+  const handleDownloadResource = (resource: Resource) => {
+    downloadResourceMutation.mutate({
+      resourceId: resource.id,
+      fallbackUrl: resource.resourceFileUrl || resource.filePath,
+    });
+  };
+
+  const handleUploadResource = () => {
+    if (!resourceForm.title.trim()) {
+      toast.error("Please enter a resource title.");
+      return;
+    }
+    if (!resourceForm.category.trim()) {
+      toast.error("Please enter a resource category.");
+      return;
+    }
+    const file = resourceFileRef.current?.files?.[0];
+    if (!file) {
+      toast.error("Please choose a resource file.");
+      return;
+    }
+    uploadResourceMutation.mutate({
+      title: resourceForm.title.trim(),
+      description: resourceForm.description.trim(),
+      category: resourceForm.category.trim(),
+      visibility: resourceForm.visibility,
+      file,
+    });
   };
 
   const filteredEvents = events.filter((e) => {
@@ -1091,6 +1189,14 @@ export default function ContentEngagementPage() {
                         {format(new Date(event.startTime), "MMM dd")}
                         {event.address ? ` • ${event.address}` : event.venue ? ` • ${event.venue}` : ""}
                       </CardDescription>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 w-full"
+                        onClick={() => handleViewEventDetails(event)}
+                      >
+                        View Details
+                      </Button>
                       {event.eventStatus === 'pending' && (
                          <div className="pt-2 flex gap-2">
                             <Button
@@ -1253,7 +1359,14 @@ export default function ContentEngagementPage() {
                                       </Button>
                                     </>
                                   ) : (
-                                    <Button size="sm" variant="outline" className="w-full">Edit Event</Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="w-full"
+                                      onClick={() => handleViewEventDetails(e)}
+                                    >
+                                      View Details
+                                    </Button>
                                   )}
                                 </div>
                               </div>
@@ -1275,13 +1388,18 @@ export default function ContentEngagementPage() {
           <Card>
              <CardHeader className="flex flex-row items-center justify-between pb-2">
                <CardTitle>Resource Performance</CardTitle>
-               <Button size="sm" variant="outline"
-                 onClick={() => {
-                   setAnalyticsDialogOpen(true);
-                 }}
-               >
-                 <Download className="h-4 w-4 mr-2" /> Analytics
-               </Button>
+               <div className="flex gap-2">
+                 <Button size="sm" onClick={() => setResourceDialogOpen(true)}>
+                   <Plus className="h-4 w-4 mr-2" /> Upload Resource
+                 </Button>
+                 <Button size="sm" variant="outline"
+                   onClick={() => {
+                     setAnalyticsDialogOpen(true);
+                   }}
+                 >
+                   <Download className="h-4 w-4 mr-2" /> Analytics
+                 </Button>
+               </div>
              </CardHeader>
             <CardContent className="p-0">
               <table className="w-full text-sm">
@@ -1357,6 +1475,13 @@ export default function ContentEngagementPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => handleDownloadResource(resource)}
+                                disabled={downloadResourceMutation.isPending}
+                              >
+                                Download
+                              </DropdownMenuItem>
                               <DropdownMenuItem className="cursor-pointer">
                                 Edit Metadata
                               </DropdownMenuItem>
@@ -1388,6 +1513,153 @@ export default function ContentEngagementPage() {
         </TabsContent>
        </Tabs>
      </div>
+
+     <Dialog open={eventDetailsOpen} onOpenChange={setEventDetailsOpen}>
+       <DialogContent className="sm:max-w-[650px]">
+         <DialogHeader>
+           <DialogTitle>{selectedEvent?.name || "Event Details"}</DialogTitle>
+           <DialogDescription>
+             {eventDetailsLoading ? "Loading event details..." : "Review event information and status."}
+           </DialogDescription>
+         </DialogHeader>
+         {selectedEvent && (
+           <div className="space-y-4">
+             {selectedEvent.coverImageUrl ? (
+               <img
+                 src={selectedEvent.coverImageUrl}
+                 alt={selectedEvent.name}
+                 className="h-48 w-full rounded-md object-cover"
+               />
+             ) : null}
+             <div className="grid gap-4 md:grid-cols-2">
+               <DetailItem label="Status" value={selectedEvent.eventStatus || "approved"} />
+               <DetailItem label="Type" value={selectedEvent.type || "-"} />
+               <DetailItem
+                 label="Starts"
+                 value={selectedEvent.startTime ? format(new Date(selectedEvent.startTime), "PPP p") : "-"}
+               />
+               <DetailItem
+                 label="Ends"
+                 value={selectedEvent.endTime ? format(new Date(selectedEvent.endTime), "PPP p") : "-"}
+               />
+               <DetailItem
+                 label="Location"
+                 value={selectedEvent.address || selectedEvent.venue || selectedEvent.externalLink || "-"}
+               />
+               <DetailItem label="Time Zone" value={selectedEvent.timeZone || "-"} />
+             </div>
+             <div>
+               <p className="text-xs font-semibold uppercase text-muted-foreground">Description</p>
+               <p className="mt-1 text-sm">{selectedEvent.description || "No description provided."}</p>
+             </div>
+           </div>
+         )}
+         <DialogFooter>
+           {selectedEvent?.eventStatus === "pending" ? (
+             <>
+               <Button
+                 variant="outline"
+                 className="border-red-200 text-red-700 hover:bg-red-50"
+                 onClick={() => handleDeclineEvent(selectedEvent.eventId)}
+                 disabled={declineEventMutation.isPending}
+               >
+                 Decline
+               </Button>
+               <Button
+                 variant="outline"
+                 className="border-green-200 text-green-700 hover:bg-green-50"
+                 onClick={() => handleApproveEvent(selectedEvent.eventId)}
+                 disabled={approveEventMutation.isPending}
+               >
+                 Approve
+               </Button>
+             </>
+           ) : null}
+           <Button variant="outline" onClick={() => setEventDetailsOpen(false)}>
+             Close
+           </Button>
+         </DialogFooter>
+       </DialogContent>
+     </Dialog>
+
+     <Dialog open={resourceDialogOpen} onOpenChange={setResourceDialogOpen}>
+       <DialogContent className="sm:max-w-[520px]">
+         <DialogHeader>
+           <DialogTitle>Upload Resource</DialogTitle>
+           <DialogDescription>Add a resource to the alumni library.</DialogDescription>
+         </DialogHeader>
+         <div className="space-y-4">
+           <div className="space-y-2">
+             <Label>Title</Label>
+             <Input
+               value={resourceForm.title}
+               onChange={(event) =>
+                 setResourceForm((prev) => ({ ...prev, title: event.target.value }))
+               }
+               disabled={uploadResourceMutation.isPending}
+             />
+           </div>
+           <div className="space-y-2">
+             <Label>Category</Label>
+             <Input
+               value={resourceForm.category}
+               onChange={(event) =>
+                 setResourceForm((prev) => ({ ...prev, category: event.target.value }))
+               }
+               disabled={uploadResourceMutation.isPending}
+             />
+           </div>
+           <div className="space-y-2">
+             <Label>Description</Label>
+             <Textarea
+               value={resourceForm.description}
+               onChange={(event) =>
+                 setResourceForm((prev) => ({ ...prev, description: event.target.value }))
+               }
+               disabled={uploadResourceMutation.isPending}
+             />
+           </div>
+           <div className="space-y-2">
+             <Label>Visibility</Label>
+             <Select
+               value={resourceForm.visibility}
+               onValueChange={(value) =>
+                 setResourceForm((prev) => ({ ...prev, visibility: value }))
+               }
+               disabled={uploadResourceMutation.isPending}
+             >
+               <SelectTrigger>
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="All">All</SelectItem>
+                 <SelectItem value="Verified">Verified</SelectItem>
+               </SelectContent>
+             </Select>
+           </div>
+           <div className="space-y-2">
+             <Label>File</Label>
+             <Input
+               ref={resourceFileRef}
+               type="file"
+               disabled={uploadResourceMutation.isPending}
+             />
+           </div>
+         </div>
+         <DialogFooter>
+           <Button
+             variant="outline"
+             onClick={() => setResourceDialogOpen(false)}
+             disabled={uploadResourceMutation.isPending}
+           >
+             Cancel
+           </Button>
+           <Button onClick={handleUploadResource} disabled={uploadResourceMutation.isPending}>
+             {uploadResourceMutation.isPending ? "Uploading..." : "Upload Resource"}
+           </Button>
+         </DialogFooter>
+       </DialogContent>
+     </Dialog>
      
      {/* ANALYTICS DIALOG */}
      <Dialog open={analyticsDialogOpen} onOpenChange={setAnalyticsDialogOpen}>
@@ -1423,3 +1695,12 @@ export default function ContentEngagementPage() {
      </>
    );
  }
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm">{value}</p>
+    </div>
+  );
+}

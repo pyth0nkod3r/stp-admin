@@ -49,6 +49,10 @@ export const API_ENDPOINTS = {
     memberById: (roomId: string, userId: string) =>
       `/dealrooms/${roomId}/members/${userId}`,
   },
+  resources: {
+    list: "/resources",
+    download: (resourceId: string) => `/resources/download/${resourceId}`,
+  },
   notifications: {
     sendEmail: "/notifications/send-email",
   },

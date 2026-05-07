@@ -130,6 +130,13 @@ export const useDealRooms = () => {
     },
   });
 
+  const fetchRoomDetail = (roomId: string) =>
+    queryClient.fetchQuery({
+      queryKey: ["dealRooms", roomId],
+      queryFn: () => apiDealRooms.fetchDealRoom(roomId),
+      staleTime: 30 * 1000,
+    });
+
   return {
     dealRooms,
     pendingDealRooms,
@@ -145,6 +152,7 @@ export const useDealRooms = () => {
     removeMemberMutation,
     approveMutation,
     rejectMutation,
+    fetchRoomDetail,
   };
 };
 

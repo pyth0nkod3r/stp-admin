@@ -96,12 +96,13 @@ const Login = () => {
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password
                 </Label>
-                {/* <button
+                <button
                   type="button"
                   className="text-xs text-primary hover:text-primary/80 transition-colors"
+                  onClick={() => navigate("/forgot-password")}
                 >
                   Forgot password?
-                </button> */}
+                </button>
               </div>
               <div className="relative">
                 <Input

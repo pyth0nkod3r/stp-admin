@@ -12,6 +12,10 @@ export interface RegisterPayload {
   email?: string;
   emailAddress?: string;
   password: string;
+  is_onboarded?: boolean | string | number;
+  password_change_required?: boolean | string | number;
+  isOnboarded?: boolean | string | number;
+  passwordChangeRequired?: boolean | string | number;
 }
 
 export interface ForgotPasswordPayload {
@@ -21,7 +25,8 @@ export interface ForgotPasswordPayload {
 
 export interface ResetPasswordPayload {
   token: string;
-  password: string;
+  password?: string;
+  newPassword?: string;
   confirmPassword?: string;
 }
 
@@ -66,12 +71,18 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
 }
 
 export async function register(payload: RegisterPayload): Promise<AuthActionResponse> {
+  const emailAddress = mapEmail(payload.email, payload.emailAddress);
+
   return apiRequest<AuthActionResponse>(API_ENDPOINTS.auth.register, {
     method: "POST",
     auth: false,
     body: JSON.stringify({
       ...payload,
-      email: mapEmail(payload.email, payload.emailAddress),
+      email: emailAddress,
+      emailAddress,
+      is_onboarded: payload.is_onboarded ?? payload.isOnboarded ?? true,
+      password_change_required:
+        payload.password_change_required ?? payload.passwordChangeRequired ?? true,
     }),
   });
 }
@@ -79,11 +90,14 @@ export async function register(payload: RegisterPayload): Promise<AuthActionResp
 export async function forgotPassword(
   payload: ForgotPasswordPayload
 ): Promise<AuthActionResponse> {
+  const emailAddress = mapEmail(payload.email, payload.emailAddress);
+
   return apiRequest<AuthActionResponse>(API_ENDPOINTS.auth.forgotPassword, {
     method: "POST",
     auth: false,
     body: JSON.stringify({
-      email: mapEmail(payload.email, payload.emailAddress),
+      email: emailAddress,
+      emailAddress,
     }),
   });
 }
@@ -91,10 +105,16 @@ export async function forgotPassword(
 export async function resetPassword(
   payload: ResetPasswordPayload
 ): Promise<AuthActionResponse> {
+  const newPassword = payload.newPassword ?? payload.password ?? "";
+
   return apiRequest<AuthActionResponse>(API_ENDPOINTS.auth.resetPassword, {
     method: "POST",
     auth: false,
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      newPassword,
+      password: newPassword,
+    }),
   });
 }
 

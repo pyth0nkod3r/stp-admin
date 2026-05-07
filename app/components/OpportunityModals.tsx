@@ -477,6 +477,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
   isLoading = false,
 }) => {
   const [memberUserId, setMemberUserId] = useState("");
+  const [removeUserId, setRemoveUserId] = useState("");
   const [members, setMembers] = useState<string[]>([]);
 
   const handleAddMember = async () => {
@@ -501,6 +502,15 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
     setMembers([]);
     setMemberUserId("");
     onClose();
+  };
+
+  const handleRemoveExistingMember = async () => {
+    if (!removeUserId.trim()) {
+      toast.error("Please enter the member user ID to remove");
+      return;
+    }
+    await onRemoveMember(removeUserId.trim());
+    setRemoveUserId("");
   };
 
   if (!room) return null;
@@ -570,6 +580,27 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({
               ))}
             </div>
           )}
+
+          <div className="space-y-2 border-t pt-4">
+            <Label htmlFor="removeUserId">Remove Member (User ID / UUID)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="removeUserId"
+                placeholder="Member UUID to remove"
+                value={removeUserId}
+                onChange={(e) => setRemoveUserId(e.target.value)}
+                disabled={isLoading}
+              />
+              <Button
+                variant="destructive"
+                onClick={handleRemoveExistingMember}
+                disabled={isLoading || !removeUserId}
+                size="sm"
+              >
+                Remove
+              </Button>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>

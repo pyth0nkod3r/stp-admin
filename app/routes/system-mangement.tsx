@@ -29,8 +29,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchBackofficeAdmins } from "@/services/apiAdmins";
+import { register } from "@/services/apiAuth";
+import { fetchUsers } from "@/services/apiUsers";
 import {
   sendEmailNotification,
   type SendEmailNotificationPayload,
@@ -44,6 +46,12 @@ export default function SystemManagementPage() {
     message: "",
     link: "",
   });
+  const [adminForm, setAdminForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+  });
 
   const {
     data: admins = [],
@@ -52,6 +60,28 @@ export default function SystemManagementPage() {
   } = useQuery({
     queryKey: ["backoffice-admins"],
     queryFn: fetchBackofficeAdmins,
+  });
+
+  const { data: usersResponse, isLoading: usersLoading } = useQuery({
+    queryKey: ["notification-users"],
+    queryFn: () => fetchUsers(1, 10000),
+  });
+
+  const users = usersResponse?.data ?? [];
+
+  const queryClient = useQueryClient();
+
+  const createAdminMutation = useMutation({
+    mutationFn: register,
+    onSuccess: () => {
+      toast.success("Admin account created successfully");
+      setAdminForm({ firstName: "", lastName: "", email: "", password: "" });
+      setIsAdminModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["backoffice-admins"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to create admin account");
+    },
   });
 
   const notificationMutation = useMutation({
@@ -76,8 +106,25 @@ export default function SystemManagementPage() {
 
   const handleAddAdmin = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Admin invitation sent successfully");
-    setIsAdminModalOpen(false);
+    if (
+      !adminForm.firstName.trim() ||
+      !adminForm.lastName.trim() ||
+      !adminForm.email.trim() ||
+      !adminForm.password
+    ) {
+      toast.error("Please fill all admin fields.");
+      return;
+    }
+
+    createAdminMutation.mutate({
+      firstName: adminForm.firstName.trim(),
+      lastName: adminForm.lastName.trim(),
+      email: adminForm.email.trim(),
+      emailAddress: adminForm.email.trim(),
+      password: adminForm.password,
+      is_onboarded: true,
+      password_change_required: true,
+    });
   };
 
   const handleSendNotification = (event: React.FormEvent<HTMLFormElement>) => {
@@ -189,30 +236,83 @@ export default function SystemManagementPage() {
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Full Name</Label>
-                        <Input id="name" placeholder="e.g. Jane Doe" required />
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          placeholder="Jane"
+                          value={adminForm.firstName}
+                          onChange={(event) =>
+                            setAdminForm((prev) => ({
+                              ...prev,
+                              firstName: event.target.value,
+                            }))
+                          }
+                          disabled={createAdminMutation.isPending}
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="email">Work Email</Label>
-                        <Input id="email" type="email" placeholder="jane@stp-alumni.edu" required />
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          placeholder="Doe"
+                          value={adminForm.lastName}
+                          onChange={(event) =>
+                            setAdminForm((prev) => ({
+                              ...prev,
+                              lastName: event.target.value,
+                            }))
+                          }
+                          disabled={createAdminMutation.isPending}
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
-                        <Label>Access Level</Label>
-                        <Select defaultValue="editor">
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="owner">Owner (Full Access)</SelectItem>
-                            <SelectItem value="editor">Editor (Content & Users)</SelectItem>
-                            <SelectItem value="viewer">Viewer (Reports Only)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label htmlFor="adminEmail">Work Email</Label>
+                        <Input
+                          id="adminEmail"
+                          type="email"
+                          placeholder="jane@stp-alumni.edu"
+                          value={adminForm.email}
+                          onChange={(event) =>
+                            setAdminForm((prev) => ({
+                              ...prev,
+                              email: event.target.value,
+                            }))
+                          }
+                          disabled={createAdminMutation.isPending}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="adminPassword">Temporary Password</Label>
+                        <Input
+                          id="adminPassword"
+                          type="password"
+                          value={adminForm.password}
+                          onChange={(event) =>
+                            setAdminForm((prev) => ({
+                              ...prev,
+                              password: event.target.value,
+                            }))
+                          }
+                          disabled={createAdminMutation.isPending}
+                          required
+                        />
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button type="button" variant="ghost" onClick={() => setIsAdminModalOpen(false)}>Cancel</Button>
-                      <Button type="submit">Send Invite</Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setIsAdminModalOpen(false)}
+                        disabled={createAdminMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={createAdminMutation.isPending}>
+                        {createAdminMutation.isPending ? "Creating..." : "Create Admin"}
+                      </Button>
                     </DialogFooter>
                   </form>
                 </DialogContent>
@@ -273,19 +373,32 @@ export default function SystemManagementPage() {
             <CardContent>
               <form className="space-y-4" onSubmit={handleSendNotification}>
                 <div className="space-y-2">
-                  <Label htmlFor="recipientId">Recipient User ID</Label>
-                  <Input
-                    id="recipientId"
+                  <Label>Recipient</Label>
+                  <Select
                     value={notificationForm.recipientId}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setNotificationForm((prev) => ({
                         ...prev,
-                        recipientId: event.target.value,
+                        recipientId: value,
                       }))
                     }
-                    placeholder="uuid-of-user"
-                    disabled={notificationMutation.isPending}
-                  />
+                    disabled={notificationMutation.isPending || usersLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          usersLoading ? "Loading users..." : "Select a user"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem key={user.userId} value={user.userId}>
+                          {`${user.firstName} ${user.lastName}`.trim() || user.email} ({user.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

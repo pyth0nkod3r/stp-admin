@@ -6,6 +6,8 @@ export default [
 
   // Login page without layout
   route("login", "routes/login.tsx"),
+  route("forgot-password", "routes/forgot-password.tsx"),
+  route("reset-password", "routes/reset-password.tsx"),
 
   // Dashboard layout for all admin pages
   layout("routes/layout.tsx", [
