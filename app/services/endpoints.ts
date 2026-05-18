@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
     lockUser: (userId: string) => `/backoffice/users/${userId}/lock`,
     unlockUser: (userId: string) => `/backoffice/users/${userId}/unlock`,
     rejectUser: (userId: string) => `/backoffice/users/${userId}/approve`,
+    deleteUser: (userId: string) => `/backoffice/users/${userId}`,
     onboardUser: "/backoffice/users/onboard",
     admins: "/backoffice/admins",
     groupsPending: "/backoffice/groups/pending",

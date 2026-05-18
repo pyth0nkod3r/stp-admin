@@ -30,7 +30,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchBackofficeAdmins } from "@/services/apiAdmins";
+import { fetchBackofficeAdmins, deleteAdmin } from "@/services/apiAdmins";
 import { register } from "@/services/apiAuth";
 import { fetchUsers } from "@/services/apiUsers";
 import {
@@ -40,6 +40,8 @@ import {
 
 export default function SystemManagementPage() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [adminToDelete, setAdminToDelete] = useState<string | null>(null);
   const [notificationForm, setNotificationForm] = useState({
     recipientId: "",
     type: "SUPPORT_RESPONSE" as SendEmailNotificationPayload["type"],
@@ -97,6 +99,19 @@ export default function SystemManagementPage() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to send notification email");
+    },
+  });
+
+  const deleteAdminMutation = useMutation({
+    mutationFn: deleteAdmin,
+    onSuccess: () => {
+      toast.success("Administrator account deleted successfully");
+      setDeleteConfirmOpen(false);
+      setAdminToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ["backoffice-admins"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to delete administrator account");
     },
   });
 
@@ -348,9 +363,55 @@ export default function SystemManagementPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="text-[10px]">{admin.role}</Badge>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <Dialog open={deleteConfirmOpen && adminToDelete === admin.userId} onOpenChange={(open) => {
+                        if (!open) {
+                          setDeleteConfirmOpen(false);
+                          setAdminToDelete(null);
+                        }
+                      }}>
+                        <button
+                          onClick={() => {
+                            setAdminToDelete(admin.userId || admin.email);
+                            setDeleteConfirmOpen(true);
+                          }}
+                          className="inline-flex items-center justify-center rounded-md h-8 w-8 text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Delete Administrator</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to delete this administrator account? This action cannot be undone.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => {
+                                setDeleteConfirmOpen(false);
+                                setAdminToDelete(null);
+                              }}
+                              disabled={deleteAdminMutation.isPending}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              onClick={() => {
+                                if (adminToDelete) {
+                                  deleteAdminMutation.mutate(adminToDelete);
+                                }
+                              }}
+                              disabled={deleteAdminMutation.isPending}
+                            >
+                              {deleteAdminMutation.isPending ? "Deleting..." : "Delete"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   </div>
                   ))

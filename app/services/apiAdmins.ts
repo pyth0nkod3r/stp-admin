@@ -42,3 +42,10 @@ export async function fetchBackofficeAdmins(): Promise<BackofficeAdmin[]> {
     .map(normalizeAdmin)
     .filter((admin: BackofficeAdmin) => Boolean(admin.userId || admin.email));
 }
+
+export async function deleteAdmin(userId: string): Promise<any> {
+  const result = await apiRequest(API_ENDPOINTS.backoffice.deleteUser(userId), {
+    method: "DELETE",
+  });
+  return result;
+}
