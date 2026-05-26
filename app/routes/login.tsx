@@ -17,8 +17,8 @@ import type { Route } from "../+types/root";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "STP Alumni - Admin Login" },
-    { name: "description", content: "STP Alumni admin login page" },
+    { title: "Blazing Connect - Admin Login" },
+    { name: "description", content: "Blazing Connect admin login page" },
   ];
 }
 
@@ -67,7 +67,7 @@ const Login = () => {
           </div>
           <div>
             <CardTitle className="text-2xl font-bold tracking-tight">
-              STP Alumni Network
+              Blazing Connect
             </CardTitle>
             <CardDescription className="text-muted-foreground mt-1">
               Sign in to access the admin dashboard
@@ -84,7 +84,7 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="stp@stp-alumni.com"
+                placeholder="admin@blazingconnect.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 bg-background/50 border-border/60 focus:border-primary"

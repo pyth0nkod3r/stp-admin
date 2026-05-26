@@ -169,7 +169,7 @@ export default function SystemManagementPage() {
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col gap-2">
         <h2 className="text-3xl font-bold tracking-tight">System & Management</h2>
-        <p className="text-muted-foreground">Manage the STP Alumni governance, security, and data.</p>
+        <p className="text-muted-foreground">Manage the Blazing Connect governance, security, and data.</p>
       </div>
 
       <Tabs defaultValue="reports" className="space-y-4">
@@ -246,7 +246,7 @@ export default function SystemManagementPage() {
                     <DialogHeader>
                       <DialogTitle>Invite New Administrator</DialogTitle>
                       <DialogDescription>
-                        Send an invitation to a team member to manage the STP platform.
+                        Send an invitation to a team member to manage the Blazing Connect platform.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -287,7 +287,7 @@ export default function SystemManagementPage() {
                         <Input
                           id="adminEmail"
                           type="email"
-                          placeholder="jane@stp-alumni.edu"
+                          placeholder="jane@blazingconnect.edu"
                           value={adminForm.email}
                           onChange={(event) =>
                             setAdminForm((prev) => ({
@@ -511,7 +511,7 @@ export default function SystemManagementPage() {
                         link: event.target.value,
                       }))
                     }
-                    placeholder="https://stp-alumni-gfa.vercel.app/support"
+                    placeholder="https://blazingconnect-gfa.vercel.app/support"
                     disabled={notificationMutation.isPending}
                   />
                 </div>
