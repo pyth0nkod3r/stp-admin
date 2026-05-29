@@ -40,7 +40,7 @@ export function UsersDirectoryExample() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold mb-4">STP Community</h2>
+        <h2 className="text-2xl font-bold mb-4">Blazing Connect Community</h2>
         <Input
           placeholder="Search by name or email..."
           value={searchTerm}

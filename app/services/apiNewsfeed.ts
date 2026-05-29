@@ -9,6 +9,11 @@ export interface NewsfeedPost {
   publishedAt: string;
   views: number;
   status: "draft" | "published";
+  coverImage?: string;
+  authorImage?: string;
+  coverImageUrl?: string;
+  authorImageUrl?: string;
+  postImages?: string[];
 }
 
 export interface CreateNewsfeedPayload {
@@ -36,6 +41,15 @@ function normalizeNewsfeedPost(post: any): NewsfeedPost {
     publishedAt: post?.publishedAt ?? post?.createdAt ?? new Date().toISOString(),
     views: asNumber(post?.views ?? post?.readCount ?? post?.viewCount),
     status: String(post?.status).toLowerCase() === "draft" ? "draft" : "published",
+    coverImage: post?.coverImage ?? post?.coverImageUrl ?? "",
+    authorImage: post?.authorImage ?? post?.authorImageUrl ?? "",
+    coverImageUrl: post?.coverImageUrl ?? post?.coverImage ?? "",
+    authorImageUrl: post?.authorImageUrl ?? post?.authorImage ?? "",
+    postImages: Array.isArray(post?.postImages) 
+      ? post.postImages 
+      : Array.isArray(post?.postImageUrls)
+        ? post.postImageUrls
+        : [],
   };
 }
 
@@ -47,13 +61,13 @@ function buildNewsfeedFormData(payload: CreateNewsfeedPayload | UpdateNewsfeedPa
   if (payload.coverImage) formData.append("coverImage", payload.coverImage);
   if (payload.authorImage) formData.append("authorImage", payload.authorImage);
   if (payload.postImages?.length) {
-    payload.postImages.forEach((image) => formData.append("postImages", image));
+    payload.postImages.forEach((image) => formData.append("postImages[]", image));
   }
   return formData;
 }
 
 export async function getNewsfeed(): Promise<NewsfeedPost[]> {
-  const result = await apiRequest<any>(API_ENDPOINTS.newsfeed.list, {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.moderationPosts, {
     method: "GET",
   });
 
@@ -63,18 +77,19 @@ export async function getNewsfeed(): Promise<NewsfeedPost[]> {
       ? result
       : [];
 
-  return rows.map(normalizeNewsfeedPost);
+  const newsRows = rows.filter((post: any) => post?.title);
+  return newsRows.map(normalizeNewsfeedPost);
 }
 
 export async function getNewsfeedPost(postId: string): Promise<NewsfeedPost> {
-  const result = await apiRequest<any>(API_ENDPOINTS.newsfeed.byId(postId), {
+  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.newsfeedById(postId), {
     method: "GET",
   });
   return normalizeNewsfeedPost(result?.data ?? result);
 }
 
 export async function createNewsfeed(payload: CreateNewsfeedPayload): Promise<void> {
-  await apiRequest(API_ENDPOINTS.newsfeed.list, {
+  await apiRequest(API_ENDPOINTS.backoffice.newsfeed, {
     method: "POST",
     body: buildNewsfeedFormData(payload),
   });
@@ -84,14 +99,18 @@ export async function updateNewsfeed(
   postId: string,
   payload: UpdateNewsfeedPayload
 ): Promise<void> {
-  await apiRequest(API_ENDPOINTS.newsfeed.byId(postId), {
+  await apiRequest(API_ENDPOINTS.backoffice.newsfeedById(postId), {
     method: "PUT",
-    body: buildNewsfeedFormData(payload),
+    body: JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      category: payload.category,
+    }),
   });
 }
 
 export async function deleteNewsfeed(postId: string): Promise<void> {
-  await apiRequest(API_ENDPOINTS.newsfeed.byId(postId), {
+  await apiRequest(API_ENDPOINTS.backoffice.newsfeedById(postId), {
     method: "DELETE",
   });
 }

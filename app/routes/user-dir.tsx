@@ -15,7 +15,8 @@ import {
   UserX,
   Lock,
   Unlock,
-  Settings
+  Settings,
+  Zap
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -118,10 +119,11 @@ export default function UserDirectoryPage() {
   const { summary: usersSummary } = useUsersSummary();
   const allUsers = allUsersResponse?.data ?? [];
   const totalCount = usersSummary?.totalUsers ?? allUsers.length;
-  const verifiedCount =
-    usersSummary?.verifiedUsers ?? allUsers.filter((u: User) => u.isVerified).length;
-  const pendingCount =
-    usersSummary?.pendingUsers ?? allUsers.filter((u: User) => !u.isVerified).length;
+  const activeCount = usersSummary?.activeUsers ?? allUsers.filter((u: User) => u.isActive).length;
+  const verifiedCount = usersSummary?.verifiedUsers ?? allUsers.filter((u: User) => u.isVerified).length;
+  const pendingCount = usersSummary?.pendingUsers ?? allUsers.filter((u: User) => !u.isVerified).length;
+  const onboardedCount = usersSummary?.onboardedUsers ?? allUsers.filter((u: User) => u.isOnboarded).length;
+  const lockedCount = usersSummary?.lockedUsers ?? allUsers.filter((u: User) => u.isLocked).length;
 
   // When filtering/searching, apply across all users (not just the current page)
   const isFiltering = statusFilter !== "ALL" || searchTerm !== "";
@@ -356,10 +358,13 @@ export default function UserDirectoryPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Alumni" value={totalCount} icon={<GraduationCap />} sub="Total registered alumni" loading={allUsersLoading} />
-        <StatCard title="Verified Alumni" value={verifiedCount} icon={<ShieldCheck />} sub="Officially verified alumni" loading={allUsersLoading} />
-        <StatCard title="Pending Review" value={pendingCount} icon={<Clock />} sub="Awaiting admin approval" color="text-orange-500" loading={allUsersLoading} />
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <StatCard title="Total Alumni" value={totalCount} icon={<GraduationCap />} sub="Registered alumni" loading={allUsersLoading} />
+        <StatCard title="Active Alumni" value={activeCount} icon={<Zap />} sub="Currently active" color="text-yellow-500" loading={allUsersLoading} />
+        <StatCard title="Verified Alumni" value={verifiedCount} icon={<ShieldCheck />} sub="Officially verified" color="text-indigo-500" loading={allUsersLoading} />
+        <StatCard title="Pending Review" value={pendingCount} icon={<Clock />} sub="Awaiting approval" color="text-orange-500" loading={allUsersLoading} />
+        <StatCard title="Onboarded Alumni" value={onboardedCount} icon={<UserCheck />} sub="Onboarding complete" color="text-emerald-500" loading={allUsersLoading} />
+        <StatCard title="Locked Accounts" value={lockedCount} icon={<Lock />} sub="Temporarily locked" color="text-red-500" loading={allUsersLoading} />
       </div>
 
       <Card className="overflow-hidden">
