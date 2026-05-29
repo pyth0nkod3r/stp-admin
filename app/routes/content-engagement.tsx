@@ -247,6 +247,8 @@ export default function ContentEngagementPage() {
     rsvpLimit: "",
   });
   const coverImageRef = useRef<HTMLInputElement>(null);
+  const newsCoverImageRef = useRef<HTMLInputElement>(null);
+  const newsAuthorImageRef = useRef<HTMLInputElement>(null);
   const newsImagesRef = useRef<HTMLInputElement>(null);
   const resourceFileRef = useRef<HTMLInputElement>(null);
 
@@ -273,6 +275,9 @@ export default function ContentEngagementPage() {
    });
    const [editNewsImages, setEditNewsImages] = useState<File[]>([]);
    const [editingNewsId, setEditingNewsId] = useState<string | null>(null);
+
+   const [selectedNewsItem, setSelectedNewsItem] = useState<NewsItem | null>(null);
+   const [newsDetailsDialogOpen, setNewsDetailsDialogOpen] = useState(false);
 
    // Analytics dialog
    const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false);
@@ -381,6 +386,8 @@ export default function ContentEngagementPage() {
         title: newsForm.title,
         body: newsForm.body,
         category: newsForm.category,
+        coverImage: newsCoverImageRef.current?.files?.[0] || undefined,
+        authorImage: newsAuthorImageRef.current?.files?.[0] || undefined,
         postImages: newsImages.length > 0 ? newsImages : undefined,
       });
       toast.success("News published successfully!");
@@ -393,6 +400,8 @@ export default function ContentEngagementPage() {
       });
       setNewsImages([]);
       if (newsImagesRef.current) newsImagesRef.current.value = "";
+      if (newsCoverImageRef.current) newsCoverImageRef.current.value = "";
+      if (newsAuthorImageRef.current) newsAuthorImageRef.current.value = "";
     } catch (error: any) {
       toast.error(error?.message || "Failed to create news");
     } finally {
@@ -507,26 +516,14 @@ export default function ContentEngagementPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Category</Label>
-                    <Select
+                    <Input
+                      placeholder="e.g. Finance, Announcement"
                       value={newsForm.category}
-                      onValueChange={(value) => setNewsForm(prev => ({ ...prev, category: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Announcement">
-                          Announcement
-                        </SelectItem>
-                        <SelectItem value="Industry Update">Industry Update</SelectItem>
-                        <SelectItem value="Spotlight">Spotlight</SelectItem>
-                        <SelectItem value="Event">Event</SelectItem>
-                        <SelectItem value="Opportunity">Opportunity</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      onChange={(e) => setNewsForm(prev => ({ ...prev, category: e.target.value }))}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label>Post Images (up to 5)</Label>
+                    <Label>Post Images</Label>
                     <Input
                       type="file"
                       accept="image/*"
@@ -543,6 +540,26 @@ export default function ContentEngagementPage() {
                         {newsImages.length} file(s) selected
                       </p>
                     )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Cover Image (Banner)</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      ref={newsCoverImageRef}
+                      className="cursor-pointer text-xs h-9"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Author Photo</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      ref={newsAuthorImageRef}
+                      className="cursor-pointer text-xs h-9"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -754,26 +771,14 @@ export default function ContentEngagementPage() {
                <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
                    <Label>Category</Label>
-                   <Select
+                   <Input
+                     placeholder="e.g. Finance, Announcement"
                      value={editNewsForm.category}
-                     onValueChange={(value) => setEditNewsForm(prev => ({ ...prev, category: value }))}
-                   >
-                     <SelectTrigger>
-                       <SelectValue placeholder="Select" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="Announcement">
-                         Announcement
-                       </SelectItem>
-                       <SelectItem value="Industry Update">Industry Update</SelectItem>
-                       <SelectItem value="Spotlight">Spotlight</SelectItem>
-                       <SelectItem value="Event">Event</SelectItem>
-                       <SelectItem value="Opportunity">Opportunity</SelectItem>
-                     </SelectContent>
-                   </Select>
+                     onChange={(e) => setEditNewsForm(prev => ({ ...prev, category: e.target.value }))}
+                   />
                  </div>
                  <div className="space-y-2">
-                   <Label>Post Images (up to 5)</Label>
+                   <Label>Post Images</Label>
                    <Input
                      type="file"
                      accept="image/*"
@@ -1009,6 +1014,97 @@ export default function ContentEngagementPage() {
            </DialogFooter>
          </DialogContent>
        </Dialog>
+
+       {/* News Details Modal */}
+       <Dialog open={newsDetailsDialogOpen} onOpenChange={setNewsDetailsDialogOpen}>
+         <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+           {selectedNewsItem && (
+             <>
+               <DialogHeader className="space-y-3">
+                 {selectedNewsItem.coverImageUrl || selectedNewsItem.coverImage ? (
+                   <div className="w-full h-56 rounded-md overflow-hidden bg-muted">
+                     <img
+                       src={selectedNewsItem.coverImageUrl || selectedNewsItem.coverImage}
+                       alt={selectedNewsItem.title}
+                       className="w-full h-full object-cover"
+                     />
+                   </div>
+                 ) : (
+                   <div className="w-full h-32 bg-gradient-to-br from-red-500/10 to-blue-500/10 flex items-center justify-center rounded-md text-muted-foreground text-sm border">
+                     <Newspaper className="h-10 w-10 opacity-40" />
+                   </div>
+                 )}
+
+                 <div className="flex items-center justify-between">
+                   <Badge variant="secondary" className="uppercase font-bold tracking-wider text-[10px]">
+                     {selectedNewsItem.category || "Official"}
+                   </Badge>
+                   <span className="text-xs text-muted-foreground">{selectedNewsItem.views.toLocaleString()} reads</span>
+                 </div>
+
+                 <DialogTitle className="text-2xl font-bold tracking-tight leading-tight">
+                   {selectedNewsItem.title}
+                 </DialogTitle>
+                 
+                 <div className="flex items-center gap-3 pt-2 text-xs text-muted-foreground">
+                   <div className="flex items-center gap-1.5">
+                     {selectedNewsItem.authorImageUrl || selectedNewsItem.authorImage ? (
+                       <img 
+                         src={selectedNewsItem.authorImageUrl || selectedNewsItem.authorImage} 
+                         alt="Author" 
+                         className="h-6 w-6 rounded-full object-cover border" 
+                       />
+                     ) : (
+                       <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px]">
+                         A
+                       </div>
+                     )}
+                     <span className="font-semibold text-foreground">Official Publisher</span>
+                   </div>
+                   <span>•</span>
+                   <span>{format(new Date(selectedNewsItem.publishedAt), "PPP p")}</span>
+                 </div>
+               </DialogHeader>
+
+               <div className="space-y-4 py-4 text-sm text-foreground/90 leading-relaxed whitespace-pre-line border-t border-b">
+                 {selectedNewsItem.content}
+               </div>
+
+               {/* Inline Post Images */}
+               {selectedNewsItem.postImages && selectedNewsItem.postImages.length > 0 && (
+                 <div className="space-y-2">
+                   <p className="text-xs font-semibold uppercase text-muted-foreground">Article Images</p>
+                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                     {selectedNewsItem.postImages.map((imgUrl, idx) => (
+                       <div key={idx} className="h-28 rounded-md overflow-hidden bg-muted border">
+                         <img
+                           src={imgUrl}
+                           alt={`Article inline ${idx + 1}`}
+                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                           onClick={() => window.open(imgUrl, "_blank")}
+                         />
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               )}
+
+               <DialogFooter className="pt-2">
+                 <Button
+                   variant="outline"
+                   onClick={() => {
+                     setNewsDetailsDialogOpen(false);
+                     setSelectedNewsItem(null);
+                   }}
+                   className="w-full sm:w-auto"
+                 >
+                   Close
+                 </Button>
+               </DialogFooter>
+             </>
+           )}
+         </DialogContent>
+       </Dialog>
      </TabsContent>
 
         {/* --- OFFICIAL NEWS FEED --- */}
@@ -1024,70 +1120,113 @@ export default function ContentEngagementPage() {
               </p>
             ) : (
               newsItems.map((news) => (
-                <Card key={news.id}>
-                  <CardHeader className="pb-2">
-                    <Badge variant="outline" className="w-fit mb-2">
-                      Official
-                    </Badge>
-                    <CardTitle className="text-base line-clamp-1">
-                      {news.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Published: {format(new Date(news.publishedAt), "MMM dd, yyyy")}</span>
+                <Card 
+                  key={news.id} 
+                  className="overflow-hidden flex flex-col justify-between h-full cursor-pointer hover:border-primary/50 transition-colors duration-200"
+                  onClick={() => {
+                    setSelectedNewsItem(news);
+                    setNewsDetailsDialogOpen(true);
+                  }}
+                >
+                  <div>
+                    {news.coverImage ? (
+                      <div className="w-full h-40 overflow-hidden bg-muted">
+                        <img
+                          src={news.coverImage}
+                          alt={news.title}
+                          className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full h-40 bg-gradient-to-br from-red-500/10 to-blue-500/10 flex items-center justify-center text-muted-foreground text-sm border-b">
+                        <Newspaper className="h-8 w-8 opacity-40" />
+                      </div>
+                    )}
+                    <CardHeader className="pb-2 pt-3">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Badge variant="secondary" className="w-fit text-[10px] uppercase font-bold tracking-wider px-2 py-0.5">
+                          {news.category || "Official"}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-base font-semibold line-clamp-2 tracking-tight">
+                        {news.title}
+                      </CardTitle>
+                    </CardHeader>
+                  </div>
+                  <CardContent className="pt-0 pb-4">
+                    <div className="flex justify-between items-center text-xs text-muted-foreground border-t pt-4">
+                      <div className="flex items-center gap-2">
+                        {news.authorImageUrl || news.authorImage ? (
+                          <img 
+                            src={news.authorImageUrl || news.authorImage} 
+                            alt="Author" 
+                            className="h-5 w-5 rounded-full object-cover border" 
+                          />
+                        ) : (
+                          <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[8px]">
+                            A
+                          </div>
+                        )}
+                        <span>Published: {format(new Date(news.publishedAt), "MMM dd, yyyy")}</span>
+                      </div>
                       <span>{news.views.toLocaleString()} reads</span>
                     </div>
-                     <div className="mt-4 flex gap-2">
-                       <Button variant="secondary" size="sm" className=""
-                         onClick={() => {
-                           setEditNewsForm({
-                             title: news.title,
-                             category: news.category,
-                             body: news.content,
-                           });
-                           setEditNewsImages([]);
-                           if (newsImagesRef.current) newsImagesRef.current.value = "";
-                           setEditingNewsId(news.id);
-                           setEditNewsDialogOpen(true);
-                         }}
-                       >
-                         Edit
-                       </Button>
-                       <DropdownMenu>
-                         <DropdownMenuTrigger asChild>
-                           <Button variant="ghost" size="icon" className="h-8">
-                             <MoreVertical className="h-4 w-4" />
-                           </Button>
-                         </DropdownMenuTrigger>
-                         <DropdownMenuContent align="end">
-                           <DropdownMenuItem className="cursor-pointer"
-                             onClick={() => {
-                               setEditNewsForm({
-                                 title: news.title,
-                                 category: news.category,
-                                 body: news.content,
-                               });
-                               setEditNewsImages([]);
-                               if (newsImagesRef.current) newsImagesRef.current.value = "";
-                               setEditingNewsId(news.id);
-                               setEditNewsDialogOpen(true);
-                             }}
-                           >
-                             Edit
-                           </DropdownMenuItem>
-                           <DropdownMenuItem
-                             className="text-destructive cursor-pointer"
-                             onClick={() => {
-                               deleteNewsMutation.mutate(news.id);
-                             }}
-                             disabled={deleteNewsMutation.isPending}
-                           >
-                             Delete
-                           </DropdownMenuItem>
-                         </DropdownMenuContent>
-                       </DropdownMenu>
-                     </div>
+                    <div className="mt-4 flex gap-2 justify-end">
+                      <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        className="h-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditNewsForm({
+                            title: news.title,
+                            category: news.category,
+                            body: news.content,
+                          });
+                          setEditNewsImages([]);
+                          if (newsImagesRef.current) newsImagesRef.current.value = "";
+                          setEditingNewsId(news.id);
+                          setEditNewsDialogOpen(true);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem className="cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditNewsForm({
+                                title: news.title,
+                                category: news.category,
+                                body: news.content,
+                              });
+                              setEditNewsImages([]);
+                              if (newsImagesRef.current) newsImagesRef.current.value = "";
+                              setEditingNewsId(news.id);
+                              setEditNewsDialogOpen(true);
+                            }}
+                          >
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteNewsMutation.mutate(news.id);
+                            }}
+                            disabled={deleteNewsMutation.isPending}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </CardContent>
                 </Card>
               ))

@@ -84,11 +84,11 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <div className={`${open ? "px-6" : "mx-auto"} py-6 flex items-center gap-3`}>
-          <img src="/logo.png" alt="STP Alumni Logo" className={open ? "w-10 h-10 object-contain drop-shadow" : "w-8 h-8 object-contain drop-shadow"} />
+          <img src="/logo.png" alt="Blazing Connect Logo" className={open ? "w-10 h-10 object-contain drop-shadow" : "w-8 h-8 object-contain drop-shadow"} />
           {open && (
             <div>
               <h2 className="text-xl font-bold text-sidebar-primary leading-tight">
-                STP Alumni Network
+                Blazing Connect
               </h2>
               <p className="text-xs text-sidebar-foreground/70 mt-1">
                 Admin Dashboard
@@ -103,18 +103,18 @@ export function AppSidebar() {
             <SidebarMenu>
               {mainItems.map((item) => (
                 item.roles && userRole && !item.roles.includes(userRole) ? null : (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className="flex items-center gap-3"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                      <NavLink
+                        to={item.url}
+                        end={item.url === "/"}
+                        className="flex items-center gap-3"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 )
               ))}
             </SidebarMenu>

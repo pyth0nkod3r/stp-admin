@@ -3,7 +3,8 @@ import {
   Download, ShieldCheck, FileText, Trash2, 
   Lock, History, Info, Plus, Moon, Sun, 
   KeyRound, Mail, Check,
-  ShieldUser
+  ShieldUser, ShieldAlert, Copy, RefreshCw, AlertTriangle,
+  ChevronsUpDown
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,11 +33,30 @@ import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchBackofficeAdmins, deleteAdmin } from "@/services/apiAdmins";
 import { register } from "@/services/apiAuth";
-import { fetchUsers } from "@/services/apiUsers";
+import { fetchUsers, fetchUsersByParams } from "@/services/apiUsers";
 import {
   sendEmailNotification,
   type SendEmailNotificationPayload,
 } from "@/services/apiNotifications";
+import { fetchSecurityLogs } from "@/services/apiSecurity";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
 
 export default function SystemManagementPage() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -55,6 +75,79 @@ export default function SystemManagementPage() {
     password: "",
   });
 
+  const [securityTypeFilter, setSecurityTypeFilter] = useState<string>("ALL");
+  const [securityPage, setSecurityPage] = useState(1);
+  const [securityLimit, setSecurityLimit] = useState(20);
+
+  const {
+    data: securityData,
+    isLoading: securityLoading,
+    isRefetching: securityRefetching,
+    refetch: refetchSecurityLogs,
+  } = useQuery({
+    queryKey: ["security-logs", securityTypeFilter, securityPage, securityLimit],
+    queryFn: () => fetchSecurityLogs(securityTypeFilter, securityPage, securityLimit),
+  });
+
+  const logs = securityData?.data ?? [];
+  const bruteForceAttempts = securityData?.bruteForce ?? [];
+
+  const handleTypeFilterChange = (value: string) => {
+    setSecurityTypeFilter(value);
+    setSecurityPage(1);
+  };
+
+  const handleLimitChange = (value: string) => {
+    setSecurityLimit(Number(value));
+    setSecurityPage(1);
+  };
+
+  const renderEventBadge = (type: string) => {
+    switch (type) {
+      case "LOGIN_SUCCESS":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <ShieldCheck className="h-3 w-3 shrink-0" />
+            Success
+          </span>
+        );
+      case "LOGIN_FAILED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+            <ShieldAlert className="h-3 w-3 shrink-0" />
+            Failed
+          </span>
+        );
+      case "PASSWORD_RESET_REQUEST":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            <KeyRound className="h-3 w-3 shrink-0" />
+            Reset Req
+          </span>
+        );
+      case "ACCOUNT_LOCKED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+            <Lock className="h-3 w-3 shrink-0" />
+            Locked
+          </span>
+        );
+      case "ACCOUNT_DELETED":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
+            <Trash2 className="h-3 w-3 shrink-0" />
+            Deleted
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+            {type}
+          </span>
+        );
+    }
+  };
+
   const {
     data: admins = [],
     isLoading: adminsLoading,
@@ -64,9 +157,13 @@ export default function SystemManagementPage() {
     queryFn: fetchBackofficeAdmins,
   });
 
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<{ userId: string; label: string } | null>(null);
+  const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
+
   const { data: usersResponse, isLoading: usersLoading } = useQuery({
-    queryKey: ["notification-users"],
-    queryFn: () => fetchUsers(1, 10000),
+    queryKey: ["notification-users", userSearchQuery],
+    queryFn: () => fetchUsersByParams({ page: 1, perPage: 50, search: userSearchQuery }),
   });
 
   const users = usersResponse?.data ?? [];
@@ -96,6 +193,7 @@ export default function SystemManagementPage() {
         message: "",
         link: "",
       });
+      setSelectedUser(null);
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to send notification email");
@@ -169,7 +267,7 @@ export default function SystemManagementPage() {
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col gap-2">
         <h2 className="text-3xl font-bold tracking-tight">System & Management</h2>
-        <p className="text-muted-foreground">Manage the STP Alumni governance, security, and data.</p>
+        <p className="text-muted-foreground">Manage the Blazing Connect governance, security, and data.</p>
       </div>
 
       <Tabs defaultValue="reports" className="space-y-4">
@@ -178,6 +276,7 @@ export default function SystemManagementPage() {
           <TabsTrigger value="governance">Platform Rules</TabsTrigger>
           <TabsTrigger value="admins">Admin Access</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="security">Security Logs</TabsTrigger>
           <TabsTrigger value="settings">My Settings</TabsTrigger>
         </TabsList>
 
@@ -246,7 +345,7 @@ export default function SystemManagementPage() {
                     <DialogHeader>
                       <DialogTitle>Invite New Administrator</DialogTitle>
                       <DialogDescription>
-                        Send an invitation to a team member to manage the STP platform.
+                        Send an invitation to a team member to manage the Blazing Connect platform.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -287,7 +386,7 @@ export default function SystemManagementPage() {
                         <Input
                           id="adminEmail"
                           type="email"
-                          placeholder="jane@stp-alumni.edu"
+                          placeholder="jane@blazingconnect.edu"
                           value={adminForm.email}
                           onChange={(event) =>
                             setAdminForm((prev) => ({
@@ -433,33 +532,78 @@ export default function SystemManagementPage() {
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={handleSendNotification}>
-                <div className="space-y-2">
-                  <Label>Recipient</Label>
-                  <Select
-                    value={notificationForm.recipientId}
-                    onValueChange={(value) =>
-                      setNotificationForm((prev) => ({
-                        ...prev,
-                        recipientId: value,
-                      }))
-                    }
-                    disabled={notificationMutation.isPending || usersLoading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          usersLoading ? "Loading users..." : "Select a user"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.userId} value={user.userId}>
-                          {`${user.firstName} ${user.lastName}`.trim() || user.email} ({user.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-2 flex flex-col">
+                  <Label className="text-sm font-medium">Recipient</Label>
+                  <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isUserPopoverOpen}
+                        className="w-full justify-between bg-background border-muted/80 text-left font-normal text-sm"
+                        disabled={notificationMutation.isPending}
+                      >
+                        {selectedUser ? (
+                          <span className="truncate">{selectedUser.label}</span>
+                        ) : (
+                          <span className="text-muted-foreground">Select user...</span>
+                        )}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search recipient (first name, last name, or email)..."
+                          value={userSearchQuery}
+                          onValueChange={setUserSearchQuery}
+                          className="h-9"
+                        />
+                        <CommandList>
+                          {usersLoading ? (
+                            <div className="p-4 text-sm text-center text-muted-foreground animate-pulse">
+                              Loading users...
+                            </div>
+                          ) : users.length === 0 ? (
+                            <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+                              No users found.
+                            </CommandEmpty>
+                          ) : (
+                            <CommandGroup>
+                              {users.map((user) => {
+                                const userLabel = `${user.firstName} ${user.lastName}`.trim() || user.email;
+                                const userSubLabel = user.email ? ` (${user.email})` : "";
+                                const fullLabel = `${userLabel}${userSubLabel}`;
+                                return (
+                                  <CommandItem
+                                    key={user.userId}
+                                    value={user.userId}
+                                    onSelect={() => {
+                                      setSelectedUser({
+                                        userId: user.userId,
+                                        label: fullLabel,
+                                      });
+                                      setNotificationForm((prev) => ({
+                                        ...prev,
+                                        recipientId: user.userId,
+                                      }));
+                                      setIsUserPopoverOpen(false);
+                                    }}
+                                    className="flex items-center justify-between cursor-pointer"
+                                  >
+                                    <span className="truncate">{fullLabel}</span>
+                                    {selectedUser?.userId === user.userId && (
+                                      <Check className="h-4 w-4 text-primary" />
+                                    )}
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 <div className="space-y-2">
@@ -511,7 +655,7 @@ export default function SystemManagementPage() {
                         link: event.target.value,
                       }))
                     }
-                    placeholder="https://stp-alumni-gfa.vercel.app/support"
+                    placeholder="https://blazingconnect-gfa.vercel.app/support"
                     disabled={notificationMutation.isPending}
                   />
                 </div>
@@ -574,6 +718,229 @@ export default function SystemManagementPage() {
                     ))}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* --- SECURITY LOGS --- */}
+        <TabsContent value="security" className="space-y-4 animate-in fade-in-50 duration-200">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-[200px]">
+                <Select value={securityTypeFilter} onValueChange={handleTypeFilterChange}>
+                  <SelectTrigger className="w-full bg-background border-muted/80">
+                    <SelectValue placeholder="Filter by event type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Event Types</SelectItem>
+                    <SelectItem value="LOGIN_SUCCESS">Login Success</SelectItem>
+                    <SelectItem value="LOGIN_FAILED">Login Failed</SelectItem>
+                    <SelectItem value="PASSWORD_RESET_REQUEST">Password Reset</SelectItem>
+                    <SelectItem value="ACCOUNT_LOCKED">Account Locked</SelectItem>
+                    <SelectItem value="ACCOUNT_DELETED">Account Deleted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="w-[140px]">
+                <Select value={String(securityLimit)} onValueChange={handleLimitChange}>
+                  <SelectTrigger className="w-full bg-background border-muted/80">
+                    <SelectValue placeholder="Limit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 per page</SelectItem>
+                    <SelectItem value="20">20 per page</SelectItem>
+                    <SelectItem value="50">50 per page</SelectItem>
+                    <SelectItem value="100">100 per page</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetchSecurityLogs()}
+                disabled={securityLoading || securityRefetching}
+                title="Refresh Logs"
+                className="bg-background border-muted/80 hover:bg-muted"
+              >
+                <RefreshCw className={`h-4 w-4 ${securityLoading || securityRefetching ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+
+            <div className="text-xs text-muted-foreground bg-muted/40 px-2 py-1 rounded border border-muted/50">
+              Showing page {securityPage} (max {securityLimit} entries per page)
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Main column: Logs table */}
+            <Card className="lg:col-span-2 border-muted/60 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl flex items-center gap-2 font-bold tracking-tight">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  Access & Security Audit Trail
+                </CardTitle>
+                <CardDescription>
+                  Real-time monitoring of authentication events, access changes, and key security triggers.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-0 sm:px-6">
+                {securityLoading ? (
+                  <div className="space-y-3 p-6">
+                    <div className="h-8 w-full bg-muted animate-pulse rounded" />
+                    <div className="h-10 w-full bg-muted animate-pulse rounded" />
+                    <div className="h-10 w-full bg-muted animate-pulse rounded" />
+                    <div className="h-10 w-full bg-muted animate-pulse rounded" />
+                    <div className="h-10 w-full bg-muted animate-pulse rounded" />
+                  </div>
+                ) : logs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed rounded-lg bg-muted/10">
+                    <History className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                    <h3 className="font-semibold text-base text-foreground">No logs found</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mt-1">
+                      There are no security logs matching the current criteria. Ensure that user access activity exists.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border rounded-md overflow-hidden bg-background">
+                    <Table>
+                      <TableHeader className="bg-muted/40">
+                        <TableRow>
+                          <TableHead className="font-semibold w-[200px]">Event Type</TableHead>
+                          <TableHead className="font-semibold">User Email</TableHead>
+                          <TableHead className="font-semibold w-[150px]">IP Address</TableHead>
+                          <TableHead className="font-semibold w-[180px] text-right">Timestamp</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {logs.map((log, index) => (
+                          <TableRow key={index} className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="align-middle">
+                              {renderEventBadge(log.eventType)}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-foreground/80 break-all select-all align-middle">
+                              {log.email}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground select-all align-middle">
+                              {log.ipAddress}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground font-medium align-middle">
+                              {new Date(log.createdAt).toLocaleString(undefined, {
+                                year: "numeric",
+                                month: "short",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                              })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {/* Pagination Controls */}
+                {!securityLoading && logs.length > 0 && (
+                  <div className="flex items-center justify-between gap-4 mt-4 pt-2 border-t">
+                    <div className="text-xs text-muted-foreground">
+                      Page {securityPage}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={securityPage <= 1}
+                        onClick={() => setSecurityPage((p) => Math.max(1, p - 1))}
+                        className="bg-background border-muted/80"
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={logs.length < securityLimit}
+                        onClick={() => setSecurityPage((p) => p + 1)}
+                        className="bg-background border-muted/80"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Sidebar Column: Potential Brute Force */}
+            <Card className="border-muted/60 shadow-sm h-fit">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2 text-rose-500 font-bold tracking-tight">
+                  <ShieldAlert className="h-5 w-5" />
+                  Brute Force Activity
+                </CardTitle>
+                <CardDescription>
+                  Monitors IP addresses with high login failure attempts. Take actions on repeated alerts.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {securityLoading ? (
+                  <div className="space-y-2">
+                    <div className="h-10 w-full bg-muted animate-pulse rounded" />
+                    <div className="h-10 w-full bg-muted animate-pulse rounded" />
+                  </div>
+                ) : bruteForceAttempts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-8 text-center border border-dashed rounded-lg bg-muted/10">
+                    <ShieldCheck className="h-8 w-8 text-emerald-500 mb-2" />
+                    <h4 className="font-semibold text-sm text-foreground">No active threats</h4>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
+                      No anomalous connection sequences detected from any single IP addresses.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="bg-red-500/5 border border-red-500/10 rounded-md p-3 mb-2">
+                      <p className="text-xs text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        {bruteForceAttempts.length} anomalous client IP(s) detected
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-normal">
+                        IPs listed below have accumulated consecutive failed auth attempts and could be attempting brute-force access.
+                      </p>
+                    </div>
+
+                    <div className="divide-y border rounded-md bg-background">
+                      {bruteForceAttempts.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 hover:bg-muted/10 transition-colors">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-mono font-bold text-foreground/90 select-all">
+                              {item.ipAddress}
+                            </p>
+                            <p className="text-[10px] text-rose-500 font-semibold flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping inline-block" />
+                              {item.attempts} failed login attempts
+                            </p>
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+                            onClick={() => {
+                              navigator.clipboard.writeText(item.ipAddress);
+                              toast.success("IP copied to clipboard");
+                            }}
+                            title="Copy IP Address"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

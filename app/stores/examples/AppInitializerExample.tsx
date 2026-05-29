@@ -42,7 +42,7 @@ export function DashboardLayout() {
     <div>
       <header className="bg-white shadow">
         <div className="px-6 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">STP Alumni Dashboard</h1>
+          <h1 className="text-2xl font-bold">Blazing Connect Dashboard</h1>
           <div>
             <p className="text-gray-700">
               Welcome, {user?.firstName} {user?.lastName}

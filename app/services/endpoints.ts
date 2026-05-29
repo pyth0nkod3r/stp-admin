@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
   },
   backoffice: {
     dashboard: "/backoffice/dashboard",
+    analytics: "/backoffice/analytics",
     users: "/backoffice/users",
     usersSummary: "/backoffice/users/summary",
     userById: (userId: string) => `/backoffice/users/${userId}`,
@@ -34,6 +35,8 @@ export const API_ENDPOINTS = {
       `/backoffice/content/resources/${resourceId}`,
     archiveResource: (resourceId: string) =>
       `/backoffice/content/resources/${resourceId}/archive`,
+    newsfeed: "/backoffice/newsfeed",
+    newsfeedById: (postId: string) => `/backoffice/newsfeed/${postId}`,
   },
   events: {
     create: "/events",
@@ -64,5 +67,8 @@ export const API_ENDPOINTS = {
     avatar: "/users/profile/avatar",
     changePassword: "/users/profile/change-password",
     preferences: "/users/preferences",
+  },
+  security: {
+    logs: "/backoffice/security-logs",
   },
 } as const;

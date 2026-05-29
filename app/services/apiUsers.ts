@@ -13,6 +13,8 @@ export interface UsersSummary {
   verifiedUsers: number;
   pendingUsers: number;
   activeUsers: number;
+  onboardedUsers: number;
+  lockedUsers: number;
 }
 
 export interface UsersSummaryResponse {
@@ -86,12 +88,16 @@ function normalizeUsersSummary(payload: any): UsersSummary {
   const verifiedUsers = asNumber(summary.verifiedUsers ?? summary.verified);
   const pendingUsers = asNumber(summary.pendingUsers ?? summary.pending);
   const activeUsers = asNumber(summary.activeUsers ?? summary.active);
+  const onboardedUsers = asNumber(summary.onboardedUsers ?? summary.onboarded);
+  const lockedUsers = asNumber(summary.lockedUsers ?? summary.locked);
 
   return {
     totalUsers,
     verifiedUsers,
     pendingUsers: pendingUsers || Math.max(totalUsers - verifiedUsers, 0),
     activeUsers,
+    onboardedUsers,
+    lockedUsers,
   };
 }
 
