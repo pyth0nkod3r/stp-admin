@@ -201,3 +201,17 @@ export async function deleteResource(resourceId: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+export async function fetchUserUploadedResources(
+  search?: string,
+  page = 1,
+  limit = 20
+): Promise<Resource[]> {
+  const result = await apiRequest<any>(API_ENDPOINTS.resources.userUploaded, {
+    method: "GET",
+    query: { search, page, limit },
+  });
+
+  const rows = Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [];
+  return rows.map(normalizeResource);
+}

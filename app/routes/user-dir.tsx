@@ -19,6 +19,7 @@ import {
   Zap
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -869,7 +870,9 @@ function ChangeRoleDialog({
 }) {
   const roles = [
     { value: "USER", label: "User" },
-    { value: "BACKOFFICE", label: "Back Office" },
+    { value: "SUPER_ADMIN", label: "Super Admin" },
+    { value: "MODERATOR_ADMIN", label: "Moderator Admin" },
+    { value: "COMMUNITY_ADMIN", label: "Community Admin" },
   ];
 
   return (
@@ -916,9 +919,11 @@ function ChangeRoleDialog({
 function StatCard({ title, value, icon, sub, color = "text-muted-foreground", loading = false }: any) {
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className={color}>{React.cloneElement(icon, { size: 16 })}</div>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium leading-normal">{title}</CardTitle>
+        <div className={cn("flex-shrink-0", color)}>
+          {React.cloneElement(icon, { size: 16 })}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (

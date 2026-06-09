@@ -218,3 +218,13 @@ export async function rejectUserVerification(userId: string): Promise<void> {
     body: JSON.stringify({ action: "reject" }),
   });
 }
+
+export async function updateUserStatus(
+  userId: string,
+  status: "active" | "disabled" | "locked"
+): Promise<void> {
+  await apiRequest(API_ENDPOINTS.backoffice.statusUpdate(userId), {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
