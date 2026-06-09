@@ -17,7 +17,8 @@ import {
   RefreshCw,
   X,
   Award,
-  Activity
+  Activity,
+  GraduationCap
 } from "lucide-react";
 
 import { 
@@ -25,7 +26,7 @@ import {
   CardContent, 
   CardHeader, 
   CardTitle, 
-  CardDescription 
+  CardDescription
 } from "@/components/ui/card";
 import {
   BarChart,
@@ -42,7 +43,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useUsersSummary } from "@/hooks/useUsers";
-import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAnalytics, useAnalyticsFilters } from "@/hooks/useAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -89,10 +90,13 @@ export default function AdminOverview() {
     country: "all",
     sector: "all",
     timeframe: "all",
+    cohort: "all",
   });
 
   const { analytics, isLoading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useAnalytics(filters);
+  const { filtersData, isLoading: filtersLoading } = useAnalyticsFilters();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Dynamic filter lists learned from the API responses over time
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
@@ -118,8 +122,32 @@ export default function AdminOverview() {
   const defaultCountries = ["Nigeria", "Ghana", "Kenya", "South Africa", "United Kingdom", "United States"];
   const defaultSectors = ["Technology", "Agriculture", "Finance", "Healthcare", "Education", "Energy"];
 
-  const countryList = availableCountries.length > 0 ? availableCountries : defaultCountries;
-  const sectorList = availableSectors.length > 0 ? availableSectors : defaultSectors;
+  const cohortList = useMemo(() => {
+    if (filtersData?.cohorts && filtersData.cohorts.length > 0) return filtersData.cohorts;
+    return ["2021", "2022", "2023", "2024", "2025", "2026"];
+  }, [filtersData]);
+
+  const countryList = useMemo(() => {
+    if (filtersData?.countries && filtersData.countries.length > 0) return filtersData.countries;
+    return availableCountries.length > 0 ? availableCountries : defaultCountries;
+  }, [filtersData, availableCountries]);
+
+  const sectorList = useMemo(() => {
+    if (filtersData?.sectors && filtersData.sectors.length > 0) return filtersData.sectors;
+    return availableSectors.length > 0 ? availableSectors : defaultSectors;
+  }, [filtersData, availableSectors]);
+
+  const timeframeList = useMemo(() => {
+    if (filtersData?.timeframes && filtersData.timeframes.length > 0) return filtersData.timeframes;
+    return [
+      { label: "Last 7 days", value: "7" },
+      { label: "Last 30 days", value: "30" },
+      { label: "Last 90 days", value: "90" },
+      { label: "Last 6 months", value: "180" },
+      { label: "Last year", value: "365" },
+      { label: "All time", value: "all" }
+    ];
+  }, [filtersData]);
 
   useEffect(() => {
     if (dashboardError) {
@@ -150,6 +178,20 @@ export default function AdminOverview() {
       members: item.memberCount,
     }));
   }, [analytics?.byCountry]);
+
+
+  const platformStatsData = useMemo(() => {
+    if (!analytics?.stats) return [];
+    return [
+      { name: "Members", value: summary?.totalUsers ?? analytics.stats.totalMembers, fill: "#6366f1" },
+      { name: "Groups", value: analytics.stats.totalGroups, fill: "#10b981" },
+      { name: "Deal Rooms", value: analytics.stats.totalDealRooms, fill: "#f59e0b" },
+      { name: "Posts", value: analytics.stats.totalPosts, fill: "#ec4899" },
+      { name: "Events", value: analytics.stats.totalEvents, fill: "#8b5cf6" },
+    ];
+  }, [analytics?.stats, summary?.totalUsers]);
+
+
 
   const sectorData = useMemo(() => {
     if (!analytics?.bySector) return [];
@@ -184,12 +226,13 @@ export default function AdminOverview() {
       country: "all",
       sector: "all",
       timeframe: "all",
+      cohort: "all",
     });
   };
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
           <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
           <TabsList className="grid w-[400px] grid-cols-2">
@@ -243,7 +286,7 @@ export default function AdminOverview() {
               </CardHeader>
               <CardContent className="pl-2">
                 <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={engagementData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f5" />
                       <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
@@ -273,7 +316,7 @@ export default function AdminOverview() {
                 ) : (
                   <>
                     <div className="h-[200px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height={200}>
                         <PieChart>
                           <Pie
                             data={userDistribution}
@@ -380,6 +423,29 @@ export default function AdminOverview() {
           <Card className="p-4 bg-card/60 backdrop-blur-md shadow-xs border border-border/80">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-4">
+                {/* Cohort Selector */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                    <GraduationCap className="h-3.5 w-3.5" /> Cohort
+                  </span>
+                  <Select
+                    value={filters.cohort || "all"}
+                    onValueChange={(val) => handleFilterChange("cohort", val)}
+                  >
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue placeholder="All Cohorts" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Cohorts</SelectItem>
+                      {cohortList.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Country Selector */}
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
@@ -389,7 +455,7 @@ export default function AdminOverview() {
                     value={filters.country || "all"}
                     onValueChange={(val) => handleFilterChange("country", val)}
                   >
-                    <SelectTrigger className="w-[180px] h-9">
+                    <SelectTrigger className="w-[160px] h-9">
                       <SelectValue placeholder="All Countries" />
                     </SelectTrigger>
                     <SelectContent>
@@ -412,7 +478,7 @@ export default function AdminOverview() {
                     value={filters.sector || "all"}
                     onValueChange={(val) => handleFilterChange("sector", val)}
                   >
-                    <SelectTrigger className="w-[180px] h-9">
+                    <SelectTrigger className="w-[160px] h-9">
                       <SelectValue placeholder="All Sectors" />
                     </SelectTrigger>
                     <SelectContent>
@@ -435,22 +501,22 @@ export default function AdminOverview() {
                     value={filters.timeframe || "all"}
                     onValueChange={(val) => handleFilterChange("timeframe", val)}
                   >
-                    <SelectTrigger className="w-[160px] h-9">
+                    <SelectTrigger className="w-[150px] h-9">
                       <SelectValue placeholder="All Time" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Time</SelectItem>
-                      <SelectItem value="7d">Last 7 Days</SelectItem>
-                      <SelectItem value="30d">Last 30 Days</SelectItem>
-                      <SelectItem value="3m">Last 3 Months</SelectItem>
-                      <SelectItem value="12m">Last 12 Months</SelectItem>
+                      {timeframeList.map((t) => (
+                        <SelectItem key={t.value} value={String(t.value)}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 self-end">
-                {(filters.country !== "all" || filters.sector !== "all" || filters.timeframe !== "all") && (
+                {(filters.country !== "all" || filters.sector !== "all" || filters.timeframe !== "all" || filters.cohort !== "all") && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -476,11 +542,11 @@ export default function AdminOverview() {
           {/* Metric Cards Row */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <MetricCard
-              title="Total Members"
-              value={analytics?.stats.totalMembers}
+              title="Total Active Members"
+              value={summary?.activeUsers}
               description={`${analytics?.stats.totalCountries || 0} Countries Represented`}
               icon={<Users className="h-4 w-4 text-indigo-600" />}
-              loading={analyticsLoading}
+              loading={loading || analyticsLoading}
             />
             <MetricCard
               title="Onboarded Members"
@@ -512,7 +578,7 @@ export default function AdminOverview() {
           {/* Visualizations Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             {/* Country distribution */}
-            <Card className="col-span-4">
+            <Card className="col-span-4 min-w-0 overflow-hidden">
               <CardHeader>
                 <CardTitle>Member Distribution by Country</CardTitle>
                 <CardDescription>Top active regions in the network</CardDescription>
@@ -527,37 +593,41 @@ export default function AdminOverview() {
                     No country data available for selected filters.
                   </div>
                 ) : (
-                  <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={countryData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="countryBarGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.9} />
-                            <stop offset="100%" stopColor="#818cf8" stopOpacity={0.3} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}`} />
-                        <Tooltip
-                          cursor={{ fill: "rgba(241, 245, 249, 0.6)" }}
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid #e2e8f0",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-                            backgroundColor: "#ffffff",
-                          }}
-                        />
-                        <Bar dataKey="members" fill="url(#countryBarGrad)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <div className="h-[300px] w-full relative min-w-0">
+                    {activeTab === "analytics" && (
+                      <ResponsiveContainer width="99%" height={300} key={activeTab + "-" + countryData.length}>
+                        <BarChart
+                          layout="vertical"
+                          data={countryData}
+                          margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                          <XAxis type="number" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis dataKey="name" type="category" fontSize={12} tickLine={false} axisLine={false} width={100} />
+                          <Tooltip
+                            cursor={{ fill: "rgba(241, 245, 249, 0.6)" }}
+                            contentStyle={{
+                              borderRadius: "8px",
+                              border: "1px solid #e2e8f0",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                              backgroundColor: "#ffffff",
+                            }}
+                          />
+                          <Bar dataKey="members" radius={[0, 4, 4, 0]} barSize={16}>
+                            {countryData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={SECTOR_COLORS[index % SECTOR_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
 
             {/* Sector distribution */}
-            <Card className="col-span-3">
+            <Card className="col-span-3 min-w-0 overflow-hidden">
               <CardHeader>
                 <CardTitle>Member Industry Sectors</CardTitle>
                 <CardDescription>Distribution across top sectors</CardDescription>
@@ -573,29 +643,31 @@ export default function AdminOverview() {
                   </div>
                 ) : (
                   <>
-                    <div className="h-[160px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={sectorData}
-                            innerRadius={45}
-                            outerRadius={65}
-                            paddingAngle={4}
-                            dataKey="value"
-                          >
-                            {sectorData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              borderRadius: "8px",
-                              border: "1px solid #e2e8f0",
-                              backgroundColor: "#ffffff",
-                            }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
+                    <div className="h-[160px] w-full relative min-w-0">
+                      {activeTab === "analytics" && (
+                        <ResponsiveContainer width="99%" height={160} key={activeTab + "-" + sectorData.length}>
+                          <PieChart>
+                            <Pie
+                              data={sectorData}
+                              innerRadius={45}
+                              outerRadius={65}
+                              paddingAngle={4}
+                              dataKey="value"
+                            >
+                              {sectorData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{
+                                borderRadius: "8px",
+                                border: "1px solid #e2e8f0",
+                                backgroundColor: "#ffffff",
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      )}
                     </div>
                     <div className="space-y-1.5 overflow-y-auto max-h-[100px] pr-1 mt-2">
                       {sectorData.map((item) => (
@@ -701,28 +773,55 @@ export default function AdminOverview() {
             </Card>
 
             {/* Analytics Summary Context */}
-            <Card className="col-span-3 flex flex-col justify-between">
+            <Card className="col-span-3 flex flex-col justify-between min-w-0 overflow-hidden">
               <CardHeader>
                 <CardTitle>Analytics Summary</CardTitle>
                 <CardDescription>Key activity overview</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="border border-indigo-100 dark:border-indigo-900/40 rounded-lg p-3 bg-indigo-50/20 dark:bg-indigo-950/10 space-y-2">
-                  <h4 className="text-sm font-semibold text-indigo-900 dark:text-indigo-400 flex items-center gap-1.5">
-                    <TrendingUp className="h-4 w-4" /> Platform Growth
+              <CardContent className="space-y-4 flex-1 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider mb-2">
+                    Platform Statistics Overview
                   </h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    The Blazing Connect platform encompasses <strong>{analytics?.stats.totalMembers || 0}</strong> active alumni,
-                    connecting from <strong>{analytics?.stats.totalCountries || 0}</strong> countries globally.
-                    Our onboarding rate sits at a strong <strong>
-                      {analytics?.stats.totalMembers 
-                        ? Math.round((analytics.stats.onboardedMembers / analytics.stats.totalMembers) * 100) 
-                        : 0}%
-                    </strong>.
-                  </p>
+                  {analyticsLoading ? (
+                    <Skeleton className="h-[200px] w-full" />
+                  ) : !platformStatsData.length ? (
+                    <div className="h-[200px] w-full flex items-center justify-center text-xs text-muted-foreground">
+                      No data available.
+                    </div>
+                  ) : (
+                    <div className="h-[200px] w-full relative min-w-0">
+                      {activeTab === "analytics" && (
+                        <ResponsiveContainer width="99%" height={200} key={activeTab + "-" + platformStatsData.length}>
+                          <BarChart
+                            layout="vertical"
+                            data={platformStatsData}
+                            margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                            <XAxis type="number" fontSize={10} tickLine={false} axisLine={false} />
+                            <YAxis dataKey="name" type="category" fontSize={11} tickLine={false} axisLine={false} width={80} />
+                            <Tooltip
+                              contentStyle={{
+                                borderRadius: "6px",
+                                border: "1px solid #e2e8f0",
+                                fontSize: "11px",
+                                padding: "4px 8px",
+                              }}
+                            />
+                            <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={12}>
+                              {platformStatsData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 border-t pt-3">
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-muted-foreground">Countries Represented</span>
                     <span className="font-bold">{analytics?.stats.totalCountries || 0}</span>
@@ -753,9 +852,11 @@ export default function AdminOverview() {
 function MetricCard({ title, value, description, icon, highlight = false, loading = false }: any) {
   return (
     <Card className={highlight ? "border-orange-200 bg-orange-50/30" : ""}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {icon}
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium leading-normal">{title}</CardTitle>
+        <div className="flex-shrink-0">
+          {icon}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (

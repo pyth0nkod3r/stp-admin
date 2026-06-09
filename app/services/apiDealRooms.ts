@@ -139,4 +139,32 @@ export const apiDealRooms = {
   async rejectDealRoom(roomId: string, reason?: string): Promise<void> {
     await this.moderateDealRoom(roomId, { action: "reject", reason });
   },
+
+  async fetchDealRoomLogs(): Promise<{ status: boolean; data: any[] }> {
+    const result = await apiRequest<any>(API_ENDPOINTS.backoffice.dealRoomLogs, {
+      method: "GET",
+    });
+    return {
+      status: Boolean(result?.status ?? true),
+      data: Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [],
+    };
+  },
+
+  async fetchDealRoomAuditLog(roomId: string): Promise<{ status: boolean; data: any[] }> {
+    const result = await apiRequest<any>(API_ENDPOINTS.backoffice.dealRoomAuditLog(roomId), {
+      method: "GET",
+    });
+    return {
+      status: Boolean(result?.status ?? true),
+      data: Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [],
+    };
+  },
+
+  async lockDealRoom(roomId: string, reason?: string): Promise<void> {
+    const body = reason ? JSON.stringify({ reason }) : JSON.stringify({});
+    await apiRequest(API_ENDPOINTS.backoffice.lockDealRoom(roomId), {
+      method: "PATCH",
+      body,
+    });
+  },
 };

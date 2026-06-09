@@ -81,6 +81,7 @@ import {
   downloadResource,
   archiveResource,
   deleteResource,
+  fetchUserUploadedResources,
   type FeedPost,
   type Resource,
 } from "@/services/apiContent";
@@ -114,6 +115,12 @@ export default function ContentEngagementPage() {
   const { data: resources = [], isLoading: resourcesLoading } = useQuery({
     queryKey: ['resources'],
     queryFn: () => getResources(),
+  });
+
+  // Fetch user-uploaded resources
+  const { data: userUploadedResources = [], isLoading: userUploadedLoading } = useQuery({
+    queryKey: ['user-uploaded-resources'],
+    queryFn: () => fetchUserUploadedResources(),
   });
 
   // Mutations for posts
@@ -155,6 +162,7 @@ export default function ContentEngagementPage() {
     mutationFn: archiveResource,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
+      queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
       toast.success('Resource archived');
     },
   });
@@ -163,6 +171,7 @@ export default function ContentEngagementPage() {
     mutationFn: deleteResource,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
+      queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
       toast.success('Resource deleted');
     },
   });
@@ -171,6 +180,7 @@ export default function ContentEngagementPage() {
     mutationFn: uploadResource,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
+      queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
       toast.success('Resource uploaded successfully');
       setResourceDialogOpen(false);
       setResourceForm({
@@ -196,6 +206,7 @@ export default function ContentEngagementPage() {
       }
       window.open(url, "_blank", "noopener,noreferrer");
       queryClient.invalidateQueries({ queryKey: ['resources'] });
+      queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to download resource");
@@ -229,6 +240,7 @@ export default function ContentEngagementPage() {
   });
   
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
+  const [resourceSubTab, setResourceSubTab] = useState<"official" | "user-uploaded">("official");
   const [eventStatusFilter, setEventStatusFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -1525,128 +1537,244 @@ export default function ContentEngagementPage() {
         {/* --- RESOURCE LIBRARY --- */}
         <TabsContent value="resources" className="space-y-4">
           <Card>
-             <CardHeader className="flex flex-row items-center justify-between pb-2">
-               <CardTitle>Resource Performance</CardTitle>
-               <div className="flex gap-2">
-                 <Button size="sm" onClick={() => setResourceDialogOpen(true)}>
-                   <Plus className="h-4 w-4 mr-2" /> Upload Resource
-                 </Button>
-                 <Button size="sm" variant="outline"
-                   onClick={() => {
-                     setAnalyticsDialogOpen(true);
-                   }}
-                 >
-                   <Download className="h-4 w-4 mr-2" /> Analytics
-                 </Button>
-               </div>
-             </CardHeader>
+            <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pb-4">
+              <div>
+                <CardTitle>Resource Library</CardTitle>
+                <CardDescription>Manage official and community user-uploaded assets.</CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex border rounded-lg p-0.5 bg-muted">
+                  <Button
+                    variant={resourceSubTab === "official" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => setResourceSubTab("official")}
+                  >
+                    Official Resources
+                  </Button>
+                  <Button
+                    variant={resourceSubTab === "user-uploaded" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => setResourceSubTab("user-uploaded")}
+                  >
+                    User Uploaded
+                  </Button>
+                </div>
+                {resourceSubTab === "official" && (
+                  <Button size="sm" onClick={() => setResourceDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" /> Upload Resource
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={() => setAnalyticsDialogOpen(true)}>
+                  <Download className="h-4 w-4 mr-2" /> Analytics
+                </Button>
+              </div>
+            </CardHeader>
             <CardContent className="p-0">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b">
-                  <tr className="text-left">
-                    <th className="p-4 font-semibold text-muted-foreground">
-                      Asset Name
-                    </th>
-                    <th className="p-4 font-semibold text-muted-foreground">
-                      Category
-                    </th>
-                    <th className="p-4 font-semibold text-muted-foreground">
-                      Visibility
-                    </th>
-                    <th className="p-4 font-semibold text-muted-foreground text-center">
-                      Downloads
-                    </th>
-                    <th className="p-4 font-semibold text-muted-foreground text-right">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resourcesLoading ? (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center">
-                        <div className="flex items-center justify-center">
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        </div>
-                      </td>
+              {resourceSubTab === "official" ? (
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 border-b">
+                    <tr className="text-left">
+                      <th className="p-4 font-semibold text-muted-foreground">Asset Name</th>
+                      <th className="p-4 font-semibold text-muted-foreground">Category</th>
+                      <th className="p-4 font-semibold text-muted-foreground">Visibility</th>
+                      <th className="p-4 font-semibold text-muted-foreground text-center">Downloads</th>
+                      <th className="p-4 font-semibold text-muted-foreground text-right">Actions</th>
                     </tr>
-                  ) : resources.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                        No resources found.
-                      </td>
-                    </tr>
-                  ) : (
-                    resources.map((resource) => (
-                      <tr
-                        key={resource.id}
-                        className="border-b last:border-0 hover:bg-muted/10 transition-colors"
-                      >
-                        <td className="p-4 flex items-center gap-3 font-medium">
-                          <div className="p-2 bg-blue-100 rounded-md">
-                            <FileBox className="h-4 w-4 text-blue-600" />
+                  </thead>
+                  <tbody>
+                    {resourcesLoading ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center">
+                          <div className="flex items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                           </div>
-                          {resource.name}
-                        </td>
-                        <td className="p-4">
-                          <Badge variant="outline" className="text-[10px]">
-                            {resource.category}
-                          </Badge>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            {resource.visibility === "All" ? (
-                              <Globe className="h-3 w-3" />
-                            ) : (
-                              <Lock className="h-3 w-3" />
-                            )}
-                            {resource.visibility}
-                          </div>
-                        </td>
-                        <td className="p-4 text-center font-bold text-blue-600 font-mono">
-                          {resource.downloads}
-                        </td>
-                        <td className="p-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                className="cursor-pointer"
-                                onClick={() => handleDownloadResource(resource)}
-                                disabled={downloadResourceMutation.isPending}
-                              >
-                                Download
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer">
-                                Edit Metadata
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="cursor-pointer"
-                                onClick={() => handleArchiveResource(resource.id)}
-                                disabled={archiveResourceMutation.isPending}
-                              >
-                                Archive Asset
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive cursor-pointer"
-                                onClick={() => handleDeleteResource(resource.id)}
-                                disabled={deleteResourceMutation.isPending}
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : resources.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                          No resources found.
+                        </td>
+                      </tr>
+                    ) : (
+                      resources.map((resource) => (
+                        <tr
+                          key={resource.id}
+                          className="border-b last:border-0 hover:bg-muted/10 transition-colors"
+                        >
+                          <td className="p-4 flex items-center gap-3 font-medium">
+                            <div className="p-2 bg-blue-100 rounded-md">
+                              <FileBox className="h-4 w-4 text-blue-600" />
+                            </div>
+                            {resource.name}
+                          </td>
+                          <td className="p-4">
+                            <Badge variant="outline" className="text-[10px]">
+                              {resource.category}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              {resource.visibility === "All" ? (
+                                <Globe className="h-3 w-3" />
+                              ) : (
+                                <Lock className="h-3 w-3" />
+                              )}
+                              {resource.visibility}
+                            </div>
+                          </td>
+                          <td className="p-4 text-center font-bold text-blue-600 font-mono">
+                            {resource.downloads}
+                          </td>
+                          <td className="p-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => handleDownloadResource(resource)}
+                                  disabled={downloadResourceMutation.isPending}
+                                >
+                                  Download
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer">
+                                  Edit Metadata
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => handleArchiveResource(resource.id)}
+                                  disabled={archiveResourceMutation.isPending}
+                                >
+                                  Archive Asset
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive cursor-pointer"
+                                  onClick={() => handleDeleteResource(resource.id)}
+                                  disabled={deleteResourceMutation.isPending}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 border-b">
+                    <tr className="text-left">
+                      <th className="p-4 font-semibold text-muted-foreground">Asset Name</th>
+                      <th className="p-4 font-semibold text-muted-foreground">Category</th>
+                      <th className="p-4 font-semibold text-muted-foreground">Uploaded By</th>
+                      <th className="p-4 font-semibold text-muted-foreground">Visibility</th>
+                      <th className="p-4 font-semibold text-muted-foreground text-center">Downloads</th>
+                      <th className="p-4 font-semibold text-muted-foreground text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userUploadedLoading ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center">
+                          <div className="flex items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                          </div>
+                        </td>
+                      </tr>
+                    ) : userUploadedResources.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                          No user uploaded resources found.
+                        </td>
+                      </tr>
+                    ) : (
+                      userUploadedResources.map((resource) => (
+                        <tr
+                          key={resource.id}
+                          className="border-b last:border-0 hover:bg-muted/10 transition-colors"
+                        >
+                          <td className="p-4 flex items-center gap-3 font-medium">
+                            <div className="p-2 bg-blue-100 rounded-md">
+                              <FileBox className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p>{resource.name}</p>
+                              {resource.description && (
+                                <p className="text-xs text-muted-foreground font-normal line-clamp-1">{resource.description}</p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Badge variant="outline" className="text-[10px]">
+                              {resource.category}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-xs">
+                                {resource.uploaderFirstName || resource.uploaderLastName 
+                                  ? `${resource.uploaderFirstName || ""} ${resource.uploaderLastName || ""}`.trim()
+                                  : "Alumni User"}
+                              </span>
+                              {resource.uploaderEmail && (
+                                <span className="text-[10px] text-muted-foreground">{resource.uploaderEmail}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              {resource.visibility === "All" ? (
+                                <Globe className="h-3 w-3" />
+                              ) : (
+                                <Lock className="h-3 w-3" />
+                              )}
+                              {resource.visibility}
+                            </div>
+                          </td>
+                          <td className="p-4 text-center font-bold text-blue-600 font-mono">
+                            {resource.downloads}
+                          </td>
+                          <td className="p-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => handleDownloadResource(resource)}
+                                  disabled={downloadResourceMutation.isPending}
+                                >
+                                  Download
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive cursor-pointer"
+                                  onClick={() => handleDeleteResource(resource.id)}
+                                  disabled={deleteResourceMutation.isPending}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

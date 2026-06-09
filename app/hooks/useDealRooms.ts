@@ -130,11 +130,37 @@ export const useDealRooms = () => {
     },
   });
 
+  const lockRoomMutation = useMutation({
+    mutationFn: ({ roomId, reason }: { roomId: string; reason?: string }) =>
+      apiDealRooms.lockDealRoom(roomId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dealRooms"] });
+      toast.success("Deal room lock status updated successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update lock status: ${error.message}`);
+    },
+  });
+
   const fetchRoomDetail = (roomId: string) =>
     queryClient.fetchQuery({
       queryKey: ["dealRooms", roomId],
       queryFn: () => apiDealRooms.fetchDealRoom(roomId),
       staleTime: 30 * 1000,
+    });
+
+  const fetchAuditLog = (roomId: string) =>
+    queryClient.fetchQuery({
+      queryKey: ["dealRooms-audit", roomId],
+      queryFn: () => apiDealRooms.fetchDealRoomAuditLog(roomId),
+      staleTime: 10 * 1000,
+    });
+
+  const fetchLogs = () =>
+    queryClient.fetchQuery({
+      queryKey: ["dealRooms-logs"],
+      queryFn: () => apiDealRooms.fetchDealRoomLogs(),
+      staleTime: 10 * 1000,
     });
 
   return {
@@ -152,7 +178,10 @@ export const useDealRooms = () => {
     removeMemberMutation,
     approveMutation,
     rejectMutation,
+    lockRoomMutation,
     fetchRoomDetail,
+    fetchAuditLog,
+    fetchLogs,
   };
 };
 

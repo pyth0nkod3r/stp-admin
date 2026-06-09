@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Plus, 
   Users, 
@@ -13,9 +13,11 @@ import {
   ArrowUpRight,
   AlertCircle,
   Loader,
+  Loader2,
   Edit,
   Trash2,
-  Eye
+  Eye,
+  History
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,7 +79,10 @@ export default function OpportunitiesPage() {
     removeMemberMutation,
     approveMutation,
     rejectMutation,
+    lockRoomMutation,
     fetchRoomDetail,
+    fetchAuditLog,
+    fetchLogs,
   } = useDealRooms();
   const [selectedTab, setSelectedTab] = useState("active");
 
@@ -90,7 +95,26 @@ export default function OpportunitiesPage() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   
+  // Logs and lock states
+  const [logs, setLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [auditLog, setAuditLog] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditModalOpen, setAuditModalOpen] = useState(false);
+  const [lockDialogOpen, setLockDialogOpen] = useState(false);
+  const [lockRoomReason, setLockRoomReason] = useState("");
+  
   const [selectedRoom, setSelectedRoom] = useState<DealRoom | undefined>(undefined);
+
+  useEffect(() => {
+    if (selectedTab === "logs") {
+      setLogsLoading(true);
+      fetchLogs()
+        .then((res) => setLogs(res.data || []))
+        .catch(() => toast.error("Failed to load logs"))
+        .finally(() => setLogsLoading(false));
+    }
+  }, [selectedTab]);
 
   // Handlers for modals
   const handleCreateOpportunity = async (data: {
@@ -188,6 +212,44 @@ export default function OpportunitiesPage() {
     });
   };
 
+  const handleViewAuditLog = async (room: DealRoom) => {
+    setSelectedRoom(room);
+    setAuditLoading(true);
+    setAuditModalOpen(true);
+    try {
+      const res = await fetchAuditLog(room.roomId);
+      setAuditLog(res.data || []);
+    } catch (err) {
+      toast.error("Failed to load audit trail");
+      setAuditModalOpen(false);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const handleLockClick = async (room: DealRoom) => {
+    setSelectedRoom(room);
+    if (room.isActive === "0") {
+      // Unlock directly
+      await lockRoomMutation.mutateAsync({ roomId: room.roomId });
+    } else {
+      // Ask lock reason
+      setLockRoomReason("");
+      setLockDialogOpen(true);
+    }
+  };
+
+  const handleLockConfirm = async () => {
+    if (selectedRoom) {
+      await lockRoomMutation.mutateAsync({
+        roomId: selectedRoom.roomId,
+        reason: lockRoomReason.trim() || undefined,
+      });
+      setLockDialogOpen(false);
+      setLockRoomReason("");
+    }
+  };
+
   const activeRooms = dealRooms.filter(room => room.isActive === "1");
   const totalVolume = activeRooms.length > 0 ? "$" + (activeRooms.length * 1.5).toFixed(1) + "M" : "$0";
   const activeRequests = activeRooms.reduce((sum, room) => sum + room.memberCount, 0);
@@ -263,6 +325,7 @@ export default function OpportunitiesPage() {
           <TabsTrigger value="active">Active Opportunities ({activeRooms.length})</TabsTrigger>
           <TabsTrigger value="all">All Opportunities ({dealRooms.length})</TabsTrigger>
           <TabsTrigger value="pending">Pending Approval ({pendingDealRooms.length})</TabsTrigger>
+          <TabsTrigger value="logs">Master Log</TabsTrigger>
         </TabsList>
 
         {isLoading || pendingDealRoomsLoading ? (
@@ -284,6 +347,8 @@ export default function OpportunitiesPage() {
                     onEdit={() => handleEditClick(room)}
                     onDelete={() => handleDeleteClick(room)}
                     onManageMembers={() => handleManageMembersClick(room)}
+                    onViewAudit={() => handleViewAuditLog(room)}
+                    onLockUnlock={() => handleLockClick(room)}
                   />
                 ))
               ) : (
@@ -303,6 +368,8 @@ export default function OpportunitiesPage() {
                     onEdit={() => handleEditClick(room)}
                     onDelete={() => handleDeleteClick(room)}
                     onManageMembers={() => handleManageMembersClick(room)}
+                    onViewAudit={() => handleViewAuditLog(room)}
+                    onLockUnlock={() => handleLockClick(room)}
                   />
                 ))
               ) : (
@@ -333,6 +400,53 @@ export default function OpportunitiesPage() {
                   <p>No pending opportunities found</p>
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="logs" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>System Activity Logs</CardTitle>
+                  <CardDescription>
+                    History of actions performed in all deal rooms.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {logsLoading ? (
+                    <div className="flex items-center justify-center p-8 text-muted-foreground gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading logs...
+                    </div>
+                  ) : logs.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground">
+                      No logs found.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/40 border-b">
+                          <tr className="text-left">
+                            <th className="px-4 py-3 font-semibold text-muted-foreground">Opportunity</th>
+                            <th className="px-4 py-3 font-semibold text-muted-foreground">Action</th>
+                            <th className="px-4 py-3 font-semibold text-muted-foreground">Performed By</th>
+                            <th className="px-4 py-3 font-semibold text-muted-foreground">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {logs.map((log, idx) => (
+                            <tr key={log.logId || idx} className="border-b last:border-0 hover:bg-muted/10">
+                              <td className="px-4 py-4 font-medium">{log.roomName}</td>
+                              <td className="px-4 py-4">{log.action}</td>
+                              <td className="px-4 py-4">{log.performedBy}</td>
+                              <td className="px-4 py-4 text-muted-foreground text-xs">
+                                {log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
           </>
         )}
@@ -409,6 +523,93 @@ export default function OpportunitiesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Audit Trail Modal */}
+      <Dialog open={auditModalOpen} onOpenChange={setAuditModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Audit Trail: {selectedRoom?.roomName}</DialogTitle>
+            <DialogDescription>
+              Chronological history of activities in this deal room.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 my-4">
+            {auditLoading ? (
+              <div className="flex items-center justify-center p-8 text-muted-foreground gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading audit trail...
+              </div>
+            ) : auditLog.length === 0 ? (
+              <div className="text-center p-8 text-muted-foreground">
+                No activity history found.
+              </div>
+            ) : (
+              <div className="relative border-l border-muted pl-6 ml-3 space-y-6">
+                {auditLog.map((log, idx) => (
+                  <div key={log.auditId || idx} className="relative">
+                    <div className="absolute -left-[31px] bg-background border rounded-full p-1 text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm">{log.action}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Performed by <span className="font-medium">{log.performedBy || log.email || "System"}</span>
+                      </p>
+                      {log.reason && (
+                        <p className="text-xs italic bg-muted/50 text-muted-foreground p-2 rounded mt-2">
+                          Reason: {log.reason}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setAuditModalOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lock Room Dialog */}
+      <Dialog open={lockDialogOpen} onOpenChange={setLockDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lock Opportunity Room</DialogTitle>
+            <DialogDescription>
+              Provide a reason for locking {selectedRoom?.roomName}. This room will be set to inactive and users will not be able to interact with it.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={lockRoomReason}
+            onChange={(e) => setLockRoomReason(e.target.value)}
+            placeholder="Reason for locking this room..."
+            className="min-h-[100px]"
+            disabled={lockRoomMutation.isPending}
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setLockDialogOpen(false)}
+              disabled={lockRoomMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleLockConfirm}
+              disabled={lockRoomMutation.isPending}
+            >
+              {lockRoomMutation.isPending ? "Locking..." : "Lock Room"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -421,6 +622,8 @@ function OpportunityCard({
   onManageMembers,
   onApprove,
   onReject,
+  onViewAudit,
+  onLockUnlock,
   isModerating = false,
 }: {
   room: DealRoom;
@@ -430,6 +633,8 @@ function OpportunityCard({
   onManageMembers: () => void;
   onApprove?: () => void;
   onReject?: () => void;
+  onViewAudit?: () => void;
+  onLockUnlock?: () => void;
   isModerating?: boolean;
 }) {
   const status = room.isActive === "1" ? "Active" : "Inactive";
@@ -462,6 +667,24 @@ function OpportunityCard({
             <DropdownMenuItem onClick={onEdit}>
               <Edit className="h-4 w-4 mr-2"/> Edit
             </DropdownMenuItem>
+            {onViewAudit && (
+              <DropdownMenuItem onClick={onViewAudit}>
+                <History className="h-4 w-4 mr-2"/> View Audit Trail
+              </DropdownMenuItem>
+            )}
+            {onLockUnlock && (
+              <DropdownMenuItem onClick={onLockUnlock}>
+                {status === "Active" ? (
+                  <>
+                    <Lock className="h-4 w-4 mr-2"/> Lock Room
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="h-4 w-4 mr-2"/> Unlock Room
+                  </>
+                )}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={onDelete}>
               <Trash2 className="h-4 w-4 mr-2"/>Delete
@@ -509,7 +732,7 @@ function OpportunityCard({
             </Button>
           </div>
         ) : (
-          <Button className="w-full" variant="outline">
+          <Button className="w-full" variant="outline" onClick={onViewDetails}>
             Audit Documents & Threads
           </Button>
         )}
