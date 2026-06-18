@@ -67,6 +67,11 @@ export default function SystemManagementPage() {
     type: "SUPPORT_RESPONSE" as SendEmailNotificationPayload["type"],
     message: "",
     link: "",
+    eventName: "",
+    postTitle: "",
+    senderName: "",
+    actorName: "",
+    action: "",
   });
   const [adminForm, setAdminForm] = useState({
     firstName: "",
@@ -192,6 +197,11 @@ export default function SystemManagementPage() {
         type: "SUPPORT_RESPONSE",
         message: "",
         link: "",
+        eventName: "",
+        postTitle: "",
+        senderName: "",
+        actorName: "",
+        action: "",
       });
       setSelectedUser(null);
     },
@@ -244,22 +254,80 @@ export default function SystemManagementPage() {
     event.preventDefault();
 
     if (!notificationForm.recipientId.trim()) {
-      toast.error("Please enter a recipient user ID.");
+      toast.error("Please select a recipient.");
       return;
     }
 
-    if (!notificationForm.message.trim()) {
-      toast.error("Please enter a message.");
-      return;
+    const contextData: Record<string, any> = {};
+
+    if (notificationForm.link.trim()) {
+      contextData.link = notificationForm.link.trim();
+    }
+
+    switch (notificationForm.type) {
+      case "SUPPORT_RESPONSE":
+      case "ONBOARDING_WELCOME":
+      case "EVENT_APPROVAL_PENDING":
+        if (!notificationForm.message.trim()) {
+          toast.error("Please enter a message.");
+          return;
+        }
+        contextData.message = notificationForm.message.trim();
+        break;
+
+      case "EVENT_UPDATE":
+        if (!notificationForm.eventName.trim()) {
+          toast.error("Please enter an event name.");
+          return;
+        }
+        if (!notificationForm.message.trim()) {
+          toast.error("Please enter an update message.");
+          return;
+        }
+        contextData.eventName = notificationForm.eventName.trim();
+        contextData.updateMessage = notificationForm.message.trim();
+        break;
+
+      case "NEW_NEWSFEED":
+        if (!notificationForm.postTitle.trim()) {
+          toast.error("Please enter a post title.");
+          return;
+        }
+        contextData.postTitle = notificationForm.postTitle.trim();
+        break;
+
+      case "NEW_MESSAGE":
+      case "CONNECTION_REQUEST":
+      case "CONNECTION_ACCEPTED":
+        if (!notificationForm.senderName.trim()) {
+          toast.error("Please enter a sender name.");
+          return;
+        }
+        contextData.senderName = notificationForm.senderName.trim();
+        break;
+
+      case "POST_ENGAGEMENT":
+        if (!notificationForm.actorName.trim()) {
+          toast.error("Please enter an actor name.");
+          return;
+        }
+        if (!notificationForm.action.trim()) {
+          toast.error("Please enter an action.");
+          return;
+        }
+        contextData.actorName = notificationForm.actorName.trim();
+        contextData.action = notificationForm.action.trim();
+        break;
+
+      default:
+        contextData.message = notificationForm.message.trim();
+        break;
     }
 
     notificationMutation.mutate({
       recipient_id: notificationForm.recipientId.trim(),
       type: notificationForm.type,
-      context_data: {
-        message: notificationForm.message.trim(),
-        ...(notificationForm.link.trim() ? { link: notificationForm.link.trim() } : {}),
-      },
+      context_data: contextData,
     });
   };
 
@@ -624,25 +692,131 @@ export default function SystemManagementPage() {
                       <SelectItem value="EVENT_UPDATE">Event Update</SelectItem>
                       <SelectItem value="NEW_NEWSFEED">New Newsfeed</SelectItem>
                       <SelectItem value="EVENT_APPROVAL_PENDING">Event Approval Pending</SelectItem>
+                      <SelectItem value="NEW_MESSAGE">New Message</SelectItem>
+                      <SelectItem value="POST_ENGAGEMENT">Post Engagement</SelectItem>
+                      <SelectItem value="CONNECTION_REQUEST">Connection Request</SelectItem>
+                      <SelectItem value="CONNECTION_ACCEPTED">Connection Accepted</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="notificationMessage">Message</Label>
-                  <Textarea
-                    id="notificationMessage"
-                    value={notificationForm.message}
-                    onChange={(event) =>
-                      setNotificationForm((prev) => ({
-                        ...prev,
-                        message: event.target.value,
-                      }))
-                    }
-                    placeholder="Your issue has been resolved."
-                    disabled={notificationMutation.isPending}
-                  />
-                </div>
+                {(notificationForm.type === "SUPPORT_RESPONSE" ||
+                  notificationForm.type === "ONBOARDING_WELCOME" ||
+                  notificationForm.type === "EVENT_APPROVAL_PENDING" ||
+                  notificationForm.type === "EVENT_UPDATE") && (
+                  <div className="space-y-2">
+                    <Label htmlFor="notificationMessage">
+                      {notificationForm.type === "EVENT_UPDATE" ? "Update Message" : "Message"}
+                    </Label>
+                    <Textarea
+                      id="notificationMessage"
+                      value={notificationForm.message}
+                      onChange={(event) =>
+                        setNotificationForm((prev) => ({
+                          ...prev,
+                          message: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        notificationForm.type === "EVENT_UPDATE"
+                          ? "The event venue has changed to Room 302."
+                          : "Your issue has been resolved."
+                      }
+                      disabled={notificationMutation.isPending}
+                    />
+                  </div>
+                )}
+
+                {notificationForm.type === "EVENT_UPDATE" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="notificationEventName">Event Name</Label>
+                    <Input
+                      id="notificationEventName"
+                      value={notificationForm.eventName}
+                      onChange={(event) =>
+                        setNotificationForm((prev) => ({
+                          ...prev,
+                          eventName: event.target.value,
+                        }))
+                      }
+                      placeholder="Alumni Homecoming 2026"
+                      disabled={notificationMutation.isPending}
+                    />
+                  </div>
+                )}
+
+                {notificationForm.type === "NEW_NEWSFEED" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="notificationPostTitle">Post Title</Label>
+                    <Input
+                      id="notificationPostTitle"
+                      value={notificationForm.postTitle}
+                      onChange={(event) =>
+                        setNotificationForm((prev) => ({
+                          ...prev,
+                          postTitle: event.target.value,
+                        }))
+                      }
+                      placeholder="New Research Grant Announced"
+                      disabled={notificationMutation.isPending}
+                    />
+                  </div>
+                )}
+
+                {(notificationForm.type === "NEW_MESSAGE" ||
+                  notificationForm.type === "CONNECTION_REQUEST" ||
+                  notificationForm.type === "CONNECTION_ACCEPTED") && (
+                  <div className="space-y-2">
+                    <Label htmlFor="notificationSenderName">Sender Name</Label>
+                    <Input
+                      id="notificationSenderName"
+                      value={notificationForm.senderName}
+                      onChange={(event) =>
+                        setNotificationForm((prev) => ({
+                          ...prev,
+                          senderName: event.target.value,
+                        }))
+                      }
+                      placeholder="Jane Doe"
+                      disabled={notificationMutation.isPending}
+                    />
+                  </div>
+                )}
+
+                {notificationForm.type === "POST_ENGAGEMENT" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="notificationActorName">Actor Name</Label>
+                      <Input
+                        id="notificationActorName"
+                        value={notificationForm.actorName}
+                        onChange={(event) =>
+                          setNotificationForm((prev) => ({
+                            ...prev,
+                            actorName: event.target.value,
+                          }))
+                        }
+                        placeholder="John Smith"
+                        disabled={notificationMutation.isPending}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="notificationAction">Action</Label>
+                      <Input
+                        id="notificationAction"
+                        value={notificationForm.action}
+                        onChange={(event) =>
+                          setNotificationForm((prev) => ({
+                            ...prev,
+                            action: event.target.value,
+                          }))
+                        }
+                        placeholder="liked your post"
+                        disabled={notificationMutation.isPending}
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="notificationLink">Link</Label>
