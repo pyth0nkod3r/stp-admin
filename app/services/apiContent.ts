@@ -137,7 +137,7 @@ export async function getResources(opts: {
   limit?: number;
   sortBy?: string;
 } = {}): Promise<Resource[]> {
-  const result = await apiRequest<any>(API_ENDPOINTS.backoffice.moderationResources, {
+  const result = await apiRequest<any>(API_ENDPOINTS.resources.list, {
     method: "GET",
     query: {
       page: opts.page ?? 1,
@@ -197,8 +197,31 @@ export async function archiveResource(resourceId: string): Promise<void> {
 }
 
 export async function deleteResource(resourceId: string): Promise<void> {
-  await apiRequest(API_ENDPOINTS.backoffice.moderationResourceById(resourceId), {
+  await apiRequest(API_ENDPOINTS.resources.delete(resourceId), {
     method: "DELETE",
+  });
+}
+
+export async function getPendingResources(
+  page = 1,
+  limit = 20
+): Promise<Resource[]> {
+  const result = await apiRequest<any>(API_ENDPOINTS.resources.pending, {
+    method: "GET",
+    query: { page, limit },
+  });
+
+  const rows = Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [];
+  return rows.map(normalizeResource);
+}
+
+export async function reviewResource(
+  resourceId: string,
+  action: "approve" | "reject"
+): Promise<void> {
+  await apiRequest(API_ENDPOINTS.resources.review(resourceId), {
+    method: "PATCH",
+    body: JSON.stringify({ action }),
   });
 }
 

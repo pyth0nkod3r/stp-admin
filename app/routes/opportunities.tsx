@@ -22,7 +22,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -288,7 +287,7 @@ export default function OpportunitiesPage() {
 
       {/* High-Level Deal Metrics */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="border-zinc-400 dark:border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Active Opportunities</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-500" />
@@ -298,7 +297,7 @@ export default function OpportunitiesPage() {
             <p className="text-xs text-muted-foreground">Active deal rooms</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-zinc-400 dark:border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Members</CardTitle>
             <Users className="h-4 w-4 text-blue-500" />
@@ -308,7 +307,7 @@ export default function OpportunitiesPage() {
             <p className="text-xs text-muted-foreground">Across all opportunities</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-zinc-400 dark:border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
             <Clock className="h-4 w-4 text-orange-500" />
@@ -403,7 +402,7 @@ export default function OpportunitiesPage() {
             </TabsContent>
 
             <TabsContent value="logs" className="space-y-4">
-              <Card>
+              <Card className="border-zinc-400 dark:border-zinc-800">
                 <CardHeader>
                   <CardTitle>System Activity Logs</CardTitle>
                   <CardDescription>
@@ -640,7 +639,7 @@ function OpportunityCard({
   const status = room.isActive === "1" ? "Active" : "Inactive";
 
   return (
-    <Card className="hover:border-primary/50 transition-all">
+    <Card className="border-zinc-400 dark:border-zinc-800 hover:border-primary/50 transition-all">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
         <div className="space-y-1 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -692,28 +691,14 @@ function OpportunityCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Opportunity</p>
-            <p className="text-lg font-bold">${(Math.random() * 5).toFixed(1)}M</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Members</p>
-            <p className="text-lg font-bold">{room.memberCount}</p>
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex justify-between text-xs font-medium">
-            <span>Funding/Completion Progress</span>
-            <span>{Math.floor(Math.random() * 100)}%</span>
-          </div>
-          <Progress value={Math.floor(Math.random() * 100)} className="h-2" />
+      <CardContent className="space-y-4">
+        <div className="flex justify-between items-center py-2 border-b">
+          <span className="text-xs font-medium text-muted-foreground">Total Members</span>
+          <span className="text-sm font-bold text-foreground">{room.memberCount}</span>
         </div>
 
         {onApprove && onReject ? (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 pt-2">
             <Button
               variant="outline"
               className="border-red-200 text-red-700 hover:bg-red-50"
@@ -732,7 +717,7 @@ function OpportunityCard({
             </Button>
           </div>
         ) : (
-          <Button className="w-full" variant="outline" onClick={onViewDetails}>
+          <Button className="w-full pt-2" variant="outline" onClick={onViewDetails}>
             Audit Documents & Threads
           </Button>
         )}

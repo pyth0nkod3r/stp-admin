@@ -82,6 +82,8 @@ import {
   archiveResource,
   deleteResource,
   fetchUserUploadedResources,
+  getPendingResources,
+  reviewResource,
   type FeedPost,
   type Resource,
 } from "@/services/apiContent";
@@ -121,6 +123,12 @@ export default function ContentEngagementPage() {
   const { data: userUploadedResources = [], isLoading: userUploadedLoading } = useQuery({
     queryKey: ['user-uploaded-resources'],
     queryFn: () => fetchUserUploadedResources(),
+  });
+
+  // Fetch pending resources
+  const { data: pendingResources = [], isLoading: pendingResourcesLoading } = useQuery({
+    queryKey: ['pending-resources'],
+    queryFn: () => getPendingResources(),
   });
 
   // Mutations for posts
@@ -163,6 +171,7 @@ export default function ContentEngagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-resources'] });
       toast.success('Resource archived');
     },
   });
@@ -172,6 +181,7 @@ export default function ContentEngagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-resources'] });
       toast.success('Resource deleted');
     },
   });
@@ -181,6 +191,7 @@ export default function ContentEngagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-resources'] });
       toast.success('Resource uploaded successfully');
       setResourceDialogOpen(false);
       setResourceForm({
@@ -207,9 +218,24 @@ export default function ContentEngagementPage() {
       window.open(url, "_blank", "noopener,noreferrer");
       queryClient.invalidateQueries({ queryKey: ['resources'] });
       queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-resources'] });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to download resource");
+    },
+  });
+
+  const reviewResourceMutation = useMutation({
+    mutationFn: ({ resourceId, action }: { resourceId: string; action: "approve" | "reject" }) =>
+      reviewResource(resourceId, action),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+      queryClient.invalidateQueries({ queryKey: ['user-uploaded-resources'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-resources'] });
+      toast.success(`Resource ${variables.action}d successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to moderate resource");
     },
   });
 
@@ -240,7 +266,7 @@ export default function ContentEngagementPage() {
   });
   
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
-  const [resourceSubTab, setResourceSubTab] = useState<"official" | "user-uploaded">("official");
+  const [resourceSubTab, setResourceSubTab] = useState<"official" | "user-uploaded" | "pending">("official");
   const [eventStatusFilter, setEventStatusFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -1560,6 +1586,19 @@ export default function ContentEngagementPage() {
                   >
                     User Uploaded
                   </Button>
+                  <Button
+                    variant={resourceSubTab === "pending" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 text-xs font-medium relative"
+                    onClick={() => setResourceSubTab("pending")}
+                  >
+                    Pending Approval
+                    {pendingResources.length > 0 && (
+                      <Badge className="ml-1.5 h-4 w-4 p-0 flex items-center justify-center bg-amber-500 text-white hover:bg-amber-600 text-[9px] font-bold rounded-full">
+                        {pendingResources.length}
+                      </Badge>
+                    )}
+                  </Button>
                 </div>
                 {resourceSubTab === "official" && (
                   <Button size="sm" onClick={() => setResourceDialogOpen(true)}>
@@ -1572,7 +1611,7 @@ export default function ContentEngagementPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {resourceSubTab === "official" ? (
+              {resourceSubTab === "official" && (
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 border-b">
                     <tr className="text-left">
@@ -1646,13 +1685,6 @@ export default function ContentEngagementPage() {
                                 <DropdownMenuItem className="cursor-pointer">
                                   Edit Metadata
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => handleArchiveResource(resource.id)}
-                                  disabled={archiveResourceMutation.isPending}
-                                >
-                                  Archive Asset
-                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-destructive cursor-pointer"
@@ -1669,7 +1701,9 @@ export default function ContentEngagementPage() {
                     )}
                   </tbody>
                 </table>
-              ) : (
+              )}
+
+              {resourceSubTab === "user-uploaded" && (
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 border-b">
                     <tr className="text-left">
@@ -1768,6 +1802,122 @@ export default function ContentEngagementPage() {
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+
+              {resourceSubTab === "pending" && (
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 border-b">
+                    <tr className="text-left">
+                      <th className="p-4 font-semibold text-muted-foreground">Asset Name</th>
+                      <th className="p-4 font-semibold text-muted-foreground">Category</th>
+                      <th className="p-4 font-semibold text-muted-foreground">Uploaded By</th>
+                      <th className="p-4 font-semibold text-muted-foreground text-center">Downloads</th>
+                      <th className="p-4 font-semibold text-muted-foreground text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingResourcesLoading ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center">
+                          <div className="flex items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                          </div>
+                        </td>
+                      </tr>
+                    ) : pendingResources.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                          No resources pending approval.
+                        </td>
+                      </tr>
+                    ) : (
+                      pendingResources.map((resource) => (
+                        <tr
+                          key={resource.id}
+                          className="border-b last:border-0 hover:bg-muted/10 transition-colors"
+                        >
+                          <td className="p-4 flex items-center gap-3 font-medium">
+                            <div className="p-2 bg-blue-100 rounded-md">
+                              <FileBox className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p>{resource.name}</p>
+                              {resource.description && (
+                                <p className="text-xs text-muted-foreground font-normal line-clamp-1">{resource.description}</p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Badge variant="outline" className="text-[10px]">
+                              {resource.category}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-xs">
+                                {resource.uploaderFirstName || resource.uploaderLastName 
+                                  ? `${resource.uploaderFirstName || ""} ${resource.uploaderLastName || ""}`.trim()
+                                  : "Alumni User"}
+                              </span>
+                              {resource.uploaderEmail && (
+                                <span className="text-[10px] text-muted-foreground">{resource.uploaderEmail}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 text-center font-bold text-blue-600 font-mono">
+                            {resource.downloads}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs border-green-200 bg-green-50/50 hover:bg-green-50 text-green-700 hover:text-green-800"
+                                onClick={() => reviewResourceMutation.mutate({ resourceId: resource.id, action: "approve" })}
+                                disabled={reviewResourceMutation.isPending}
+                              >
+                                <Check className="h-3.5 w-3.5 mr-1" /> Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs border-destructive/20 bg-destructive/5 hover:bg-destructive/10 text-destructive"
+                                onClick={() => reviewResourceMutation.mutate({ resourceId: resource.id, action: "reject" })}
+                                disabled={reviewResourceMutation.isPending}
+                              >
+                                <X className="h-3.5 w-3.5 mr-1" /> Reject
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() => handleDownloadResource(resource)}
+                                    disabled={downloadResourceMutation.isPending}
+                                  >
+                                    Download
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive cursor-pointer"
+                                    onClick={() => handleDeleteResource(resource.id)}
+                                    disabled={deleteResourceMutation.isPending}
+                                  >
+                                    Delete Permanent
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </td>
                         </tr>
                       ))

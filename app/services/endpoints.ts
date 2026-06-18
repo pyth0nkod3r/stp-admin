@@ -66,7 +66,10 @@ export const API_ENDPOINTS = {
   resources: {
     list: "/resources",
     download: (resourceId: string) => `/resources/download/${resourceId}`,
-    userUploaded: "/resources/user-uploaded",
+    userUploaded: "/backoffice/resources/user-uploaded",
+    pending: "/backoffice/resources/pending",
+    review: (resourceId: string) => `/resources/${resourceId}/review`,
+    delete: (resourceId: string) => `/resources/${resourceId}`,
   },
   notifications: {
     sendEmail: "/notifications/send-email",
