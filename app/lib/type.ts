@@ -1,41 +1,3 @@
-// Generate realistic mock data for the admin dashboard
-
-export interface DashboardData {
-  status: number;
-  error: boolean;
-  message: string;
-  data: {
-    metadata: {
-      period: number;
-      periodLabel: string;
-    };
-    overview: {
-      riders: {
-        total: number;
-        recent: number;
-      };
-      drivers: {
-        total: number;
-        recent: number;
-      };
-      rides: {
-        total: number;
-        recent: number;
-      };
-      users: {
-        total: number;
-        recent: number;
-      };
-    };
-    trends: Array<{
-      date: string;
-      label: string;
-      riders: number;
-      drivers: number;
-    }>;
-  };
-}
-
 export interface User {
   userId: string;
   firstName: string;
@@ -50,6 +12,7 @@ export interface User {
   lastLogin: string | null;
   createdAt: string;
   updatedAt: string;
+  tempPassword?: string | null;
 }
 
 export interface Event {

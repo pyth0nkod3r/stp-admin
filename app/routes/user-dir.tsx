@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   MoreHorizontal,
   Search,
@@ -16,7 +16,10 @@ import {
   Lock,
   Unlock,
   Settings,
-  Zap
+  Zap,
+  Eye,
+  EyeOff,
+  Copy
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -620,6 +623,13 @@ export default function UserDirectoryPage() {
 // Profile View Dialog Component
 function ProfileViewDialog({ user, open, onOpenChange }: { user: User | null; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { profile, isLoading, error } = useUserProfile(user?.userId ?? null);
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setShowPassword(false);
+    }
+  }, [open]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not available";
@@ -799,6 +809,42 @@ function ProfileViewDialog({ user, open, onOpenChange }: { user: User | null; op
                 <p className="text-sm">{profile.contactVisibility}</p>
               </div>
             </div>
+
+            {/* Temporary Password */}
+            {profile.tempPassword && (
+              <div className="border-t pt-4">
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Temporary Password</p>
+                <div className="flex items-center gap-2 max-w-xs">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={profile.tempPassword}
+                      readOnly
+                      className="font-mono text-sm pr-10 bg-muted/10 h-9"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 flex-shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(profile.tempPassword || "");
+                      toast.success("Temporary password copied to clipboard");
+                    }}
+                    title="Copy Password"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Settings */}
             <div className="border-t pt-4 bg-muted/30 p-3 rounded">

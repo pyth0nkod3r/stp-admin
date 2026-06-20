@@ -50,6 +50,7 @@ export interface UserProfileResponse {
     role: string;
     createdAt: string;
     lastLogin: string | null;
+    tempPassword?: string | null;
     title: string | null;
     companyName: string | null;
     location: string | null;
