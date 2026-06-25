@@ -40,7 +40,7 @@ const mainItems: SidebarItem[] = [
   { title: "User Directory", url: "/admin/users", icon: Users },
   { title: "Groups", url: "/admin/groups", icon: ShieldCheck },
   // { title: "Verification Queue", url: "/admin/verification", icon: ShieldCheck }, // NOTE: No longer needed
-  { title: "Opportunities", url: "/admin/opportunities", icon: Briefcase },
+  { title: "Dealroom", url: "/admin/dealroom", icon: Briefcase },
   { title: "Content & Engagement", url: "/admin/content", icon: Megaphone },
   {
     title: "Register Admin",
