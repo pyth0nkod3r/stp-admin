@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   LogOut,
   UserPlus,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,7 +40,7 @@ const mainItems: SidebarItem[] = [
   { title: "User Directory", url: "/admin/users", icon: Users },
   { title: "Groups", url: "/admin/groups", icon: ShieldCheck },
   // { title: "Verification Queue", url: "/admin/verification", icon: ShieldCheck }, // NOTE: No longer needed
-  { title: "Opportunities", url: "/admin/opportunities", icon: Briefcase },
+  { title: "Dealroom", url: "/admin/dealroom", icon: Briefcase },
   { title: "Content & Engagement", url: "/admin/content", icon: Megaphone },
   {
     title: "Register Admin",
@@ -47,6 +48,7 @@ const mainItems: SidebarItem[] = [
     icon: UserPlus,
     roles: ["BACKOFFICE", "ADMIN"],
   },
+  { title: "Support Messages", url: "/admin/support-messages", icon: Inbox },
   { title: "System & Management", url: "/admin/system", icon: Settings },
   // { title: "Contacts", url: "/admin/contacts", icon: Contact },
 ];

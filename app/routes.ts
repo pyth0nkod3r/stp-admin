@@ -15,10 +15,11 @@ export default [
     route("admin/users", "routes/user-dir.tsx"),
     route("admin/groups", "routes/groups.tsx"),
     // route("admin/verification", "routes/verification-queue.tsx"), // NOTE: Verification queue no longer needed
-    route("admin/opportunities", "routes/opportunities.tsx"),
+    route("admin/dealroom", "routes/dealroom.tsx"),
     route("admin/content", "routes/content-engagement.tsx"),
     route("admin/register-admin", "routes/admin-registration.tsx"),
     route("admin/system", "routes/system-mangement.tsx"),
+    route("admin/support-messages", "routes/support-messages.tsx"),
     // route("admin/contacts", "routes/contacts.tsx"),
   ]),
 ] satisfies RouteConfig;

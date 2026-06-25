@@ -362,9 +362,9 @@ export default function SystemManagementPage() {
               onExport={() => exportData("Networking")}
             />
             <ExportCard 
-              title="Opportunity Logs" 
-              desc="Record of Opportunity requests and document access."
-              onExport={() => exportData("Opportunities")}
+              title="Dealroom Logs" 
+              desc="Record of Dealroom requests and document access."
+              onExport={() => exportData("Dealrooms")}
             />
           </div>
         </TabsContent>
@@ -454,7 +454,7 @@ export default function SystemManagementPage() {
                         <Input
                           id="adminEmail"
                           type="email"
-                          placeholder="jane@blazingconnect.edu"
+                          placeholder="app@blazingtorrent.org"
                           value={adminForm.email}
                           onChange={(event) =>
                             setAdminForm((prev) => ({

@@ -258,11 +258,11 @@ export default function OpportunitiesPage() {
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Alumni Opportunities</h2>
-          <p className="text-muted-foreground">Oversee private opportunities, investments, and partnerships.</p>
+          <h2 className="text-3xl font-bold tracking-tight">Alumni Dealrooms</h2>
+          <p className="text-muted-foreground">Oversee private dealrooms, investments, and partnerships.</p>
         </div>
         <Button onClick={() => setCreateModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Post New Opportunity
+          <Plus className="h-4 w-4 mr-2" /> Post New Dealroom
         </Button>
       </div>
 
@@ -271,7 +271,7 @@ export default function OpportunitiesPage() {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to load opportunities. Please try again later.
+            Failed to load dealrooms. Please try again later.
           </AlertDescription>
         </Alert>
       )}
@@ -280,7 +280,7 @@ export default function OpportunitiesPage() {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to load pending opportunities. Please try again later.
+            Failed to load pending dealrooms. Please try again later.
           </AlertDescription>
         </Alert>
       )}
@@ -289,7 +289,7 @@ export default function OpportunitiesPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-zinc-400 dark:border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active Opportunities</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Dealrooms</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -304,7 +304,7 @@ export default function OpportunitiesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalMembers}</div>
-            <p className="text-xs text-muted-foreground">Across all opportunities</p>
+            <p className="text-xs text-muted-foreground">Across all dealrooms</p>
           </CardContent>
         </Card>
         <Card className="border-zinc-400 dark:border-zinc-800">
@@ -321,8 +321,8 @@ export default function OpportunitiesPage() {
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="active">Active Opportunities ({activeRooms.length})</TabsTrigger>
-          <TabsTrigger value="all">All Opportunities ({dealRooms.length})</TabsTrigger>
+          <TabsTrigger value="active">Active Dealrooms ({activeRooms.length})</TabsTrigger>
+          <TabsTrigger value="all">All Dealrooms ({dealRooms.length})</TabsTrigger>
           <TabsTrigger value="pending">Pending Approval ({pendingDealRooms.length})</TabsTrigger>
           <TabsTrigger value="logs">Master Log</TabsTrigger>
         </TabsList>
@@ -331,7 +331,7 @@ export default function OpportunitiesPage() {
           <div className="flex items-center justify-center py-12 px-4">
             <div className="text-center">
               <Loader className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Loading opportunities...</p>
+              <p className="text-muted-foreground">Loading dealrooms...</p>
             </div>
           </div>
         ) : (
@@ -352,7 +352,7 @@ export default function OpportunitiesPage() {
                 ))
               ) : (
                 <div className="col-span-2 text-center py-12 text-muted-foreground">
-                  <p>No active opportunities found</p>
+                  <p>No active dealrooms found</p>
                 </div>
               )}
             </TabsContent>
@@ -373,7 +373,7 @@ export default function OpportunitiesPage() {
                 ))
               ) : (
                 <div className="col-span-2 text-center py-12 text-muted-foreground">
-                  <p>No opportunities found</p>
+                  <p>No dealrooms found</p>
                 </div>
               )}
             </TabsContent>
@@ -396,7 +396,7 @@ export default function OpportunitiesPage() {
               ) : (
                 <div className="col-span-2 text-center py-12 text-muted-foreground">
                   <ShieldCheck className="h-8 w-8 mx-auto mb-3 opacity-60" />
-                  <p>No pending opportunities found</p>
+                  <p>No pending dealrooms found</p>
                 </div>
               )}
             </TabsContent>
@@ -423,7 +423,7 @@ export default function OpportunitiesPage() {
                       <table className="w-full text-sm">
                         <thead className="bg-muted/40 border-b">
                           <tr className="text-left">
-                            <th className="px-4 py-3 font-semibold text-muted-foreground">Opportunity</th>
+                            <th className="px-4 py-3 font-semibold text-muted-foreground">Dealroom</th>
                             <th className="px-4 py-3 font-semibold text-muted-foreground">Action</th>
                             <th className="px-4 py-3 font-semibold text-muted-foreground">Performed By</th>
                             <th className="px-4 py-3 font-semibold text-muted-foreground">Date</th>
@@ -493,9 +493,9 @@ export default function OpportunitiesPage() {
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reject Opportunity</DialogTitle>
+            <DialogTitle>Reject Dealroom</DialogTitle>
             <DialogDescription>
-              Add an optional reason for rejecting {selectedRoom?.roomName || "this opportunity"}.
+              Add an optional reason for rejecting {selectedRoom?.roomName || "this dealroom"}.
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -517,7 +517,7 @@ export default function OpportunitiesPage() {
               onClick={handleRejectOpportunity}
               disabled={rejectMutation.isPending}
             >
-              {rejectMutation.isPending ? "Rejecting..." : "Reject Opportunity"}
+              {rejectMutation.isPending ? "Rejecting..." : "Reject Dealroom"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -579,7 +579,7 @@ export default function OpportunitiesPage() {
       <Dialog open={lockDialogOpen} onOpenChange={setLockDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Lock Opportunity Room</DialogTitle>
+            <DialogTitle>Lock Dealroom</DialogTitle>
             <DialogDescription>
               Provide a reason for locking {selectedRoom?.roomName}. This room will be set to inactive and users will not be able to interact with it.
             </DialogDescription>
