@@ -47,3 +47,18 @@ export interface Contact {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface SupportMessage {
+  id: string;
+  requestId: string;
+  fullName: string;
+  email: string;
+  subject: string;
+  message: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+

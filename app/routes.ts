@@ -19,6 +19,7 @@ export default [
     route("admin/content", "routes/content-engagement.tsx"),
     route("admin/register-admin", "routes/admin-registration.tsx"),
     route("admin/system", "routes/system-mangement.tsx"),
+    route("admin/support-messages", "routes/support-messages.tsx"),
     // route("admin/contacts", "routes/contacts.tsx"),
   ]),
 ] satisfies RouteConfig;

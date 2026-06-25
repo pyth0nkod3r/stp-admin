@@ -47,6 +47,8 @@ export const API_ENDPOINTS = {
       `/backoffice/content/resources/${resourceId}/archive`,
     newsfeed: "/backoffice/newsfeed",
     newsfeedById: (postId: string) => `/backoffice/newsfeed/${postId}`,
+    supportMessages: "/backoffice/account-requests",
+    supportMessageById: (requestId: string) => `/backoffice/account-requests/${requestId}`,
   },
   events: {
     create: "/events",

@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   LogOut,
   UserPlus,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 
@@ -47,6 +48,7 @@ const mainItems: SidebarItem[] = [
     icon: UserPlus,
     roles: ["BACKOFFICE", "ADMIN"],
   },
+  { title: "Support Messages", url: "/admin/support-messages", icon: Inbox },
   { title: "System & Management", url: "/admin/system", icon: Settings },
   // { title: "Contacts", url: "/admin/contacts", icon: Contact },
 ];
