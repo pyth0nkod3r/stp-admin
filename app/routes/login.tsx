@@ -84,7 +84,7 @@ const Login = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@blazingconnect.com"
+                placeholder="app@blazingtorrent.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 bg-background/50 border-border/60 focus:border-primary"

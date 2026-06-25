@@ -454,7 +454,7 @@ export default function SystemManagementPage() {
                         <Input
                           id="adminEmail"
                           type="email"
-                          placeholder="jane@blazingconnect.edu"
+                          placeholder="app@blazingtorrent.org"
                           value={adminForm.email}
                           onChange={(event) =>
                             setAdminForm((prev) => ({
