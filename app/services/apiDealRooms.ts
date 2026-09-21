@@ -167,4 +167,36 @@ export const apiDealRooms = {
       body,
     });
   },
+
+  async fetchDealRoomMembers(roomId: string): Promise<DealRoomMember[]> {
+    try {
+      const result = await apiRequest<DealRoomMembersResponse>(
+        API_ENDPOINTS.backoffice.dealRoomMembers(roomId),
+        {
+          method: "GET",
+        }
+      );
+      return Array.isArray(result?.data) ? result.data : [];
+    } catch (err: any) {
+      const serverMessage = err?.message || "Failed to fetch deal room members";
+      throw new Error(`Server Error (${serverMessage})`);
+    }
+  },
 };
+
+export interface DealRoomMember {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  location: string;
+  title?: string;
+  companyName?: string;
+  joinedAt?: string;
+}
+
+export interface DealRoomMembersResponse {
+  status: boolean;
+  data: DealRoomMember[];
+  total: number;
+}

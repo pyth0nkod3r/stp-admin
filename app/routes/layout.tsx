@@ -30,12 +30,12 @@ export default function Layout() {
       <div className="flex min-h-screen w-full">
         <AppSidebar />
 
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 min-w-0 flex flex-col">
           <header className="sticky top-0 z-5 flex h-16 items-center gap-4 border-b bg-background px-6">
             <SidebarTrigger />
           </header>
 
-          <div className="flex-1 p-6 md:p-8 lg:p-10">
+          <div className="flex-1 min-w-0 p-4 md:p-6 lg:p-8">
             <Outlet />
           </div>
         </main>

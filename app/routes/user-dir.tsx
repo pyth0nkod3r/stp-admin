@@ -19,8 +19,10 @@ import {
   Zap,
   Eye,
   EyeOff,
-  Copy
+  Copy,
+  Pencil,
 } from "lucide-react";
+import { EditUserDialog } from "@/components/EditUserDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -100,11 +102,18 @@ export default function UserDirectoryPage() {
   const [addForm, setAddForm] = useState({ firstName: "", lastName: "", emailAddress: "" });
   const [profileOpen, setProfileOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<User | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [roleChangeOpen, setRoleChangeOpen] = useState(false);
   const [userToChangeRole, setUserToChangeRole] = useState<User | null>(null);
   const [newRole, setNewRole] = useState("");
+
+  const handleEditUser = (user: User) => {
+    setUserToEdit(user);
+    setEditOpen(true);
+  };
 
   // Mutations
   const createUserMutation = useCreateUserMutation();
@@ -494,6 +503,12 @@ export default function UserDirectoryPage() {
                              >
                                <ExternalLink className="mr-2 h-4 w-4" /> View Profile
                              </DropdownMenuItem>
+                             <DropdownMenuItem
+                               className="cursor-pointer text-indigo-600 dark:text-indigo-400 font-medium"
+                               onClick={() => handleEditUser(person)}
+                             >
+                               <Pencil className="mr-2 h-4 w-4" /> Edit User
+                             </DropdownMenuItem>
                              {!person.isVerified && (
                                <DropdownMenuItem
                                  className="cursor-pointer text-blue-600"
@@ -593,6 +608,13 @@ export default function UserDirectoryPage() {
         user={selectedUser}
         open={profileOpen}
         onOpenChange={setProfileOpen}
+      />
+
+      {/* Edit User Dialog */}
+      <EditUserDialog
+        user={userToEdit}
+        open={editOpen}
+        onOpenChange={setEditOpen}
       />
 
       {/* Delete Confirmation Dialog */}
