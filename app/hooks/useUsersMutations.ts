@@ -1,8 +1,9 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useUsersStore } from "@/stores/usersStore";
 import {
   createUser,
+  editUser,
   verifyUser,
   deleteUser,
   activateUser,
@@ -13,6 +14,7 @@ import {
   rejectUserVerification,
   exportUsersCsv,
   type CreateUserPayload,
+  type EditUserPayload,
   type ExportUsersFilters,
 } from "@/services/apiUsers";
 
@@ -177,6 +179,30 @@ export function useExportUsersMutation() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to export users CSV");
+    },
+  });
+}
+
+export function useEditUserMutation() {
+  const queryClient = useQueryClient();
+  const store = useUsersStore();
+
+  return useMutation({
+    mutationFn: ({ userId, payload }: { userId: string; payload: EditUserPayload }) =>
+      editUser(userId, payload),
+    onSuccess: (_data, { userId, payload }) => {
+      store.updateUser(userId, {
+        ...(payload.firstName && { firstName: payload.firstName }),
+        ...(payload.lastName && { lastName: payload.lastName }),
+        ...(payload.email && { email: payload.email }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile", userId] });
+      toast.success("User details updated successfully");
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Failed to update user details");
     },
   });
 }

@@ -62,6 +62,7 @@ import {
   DeleteConfirmationModal,
   ManageMembersModal,
 } from "@/components/OpportunityModals";
+import { DealRoomMembersModal } from "@/components/DealRoomMembersModal";
 
 export default function OpportunitiesPage() {
   const { 
@@ -91,6 +92,7 @@ export default function OpportunitiesPage() {
   const [viewDetailsModalOpen, setViewDetailsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [manageMembersModalOpen, setManageMembersModalOpen] = useState(false);
+  const [viewMembersModalOpen, setViewMembersModalOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   
@@ -165,6 +167,11 @@ export default function OpportunitiesPage() {
       await deleteMutation.mutateAsync(selectedRoom.roomId);
       setDeleteModalOpen(false);
     }
+  };
+
+  const handleViewMembersClick = (room: DealRoom) => {
+    setSelectedRoom(room);
+    setViewMembersModalOpen(true);
   };
 
   const handleManageMembersClick = (room: DealRoom) => {
@@ -343,6 +350,7 @@ export default function OpportunitiesPage() {
                     key={room.roomId}
                     room={room}
                     onViewDetails={() => handleViewDetails(room)}
+                    onViewMembers={() => handleViewMembersClick(room)}
                     onEdit={() => handleEditClick(room)}
                     onDelete={() => handleDeleteClick(room)}
                     onManageMembers={() => handleManageMembersClick(room)}
@@ -364,6 +372,7 @@ export default function OpportunitiesPage() {
                     key={room.roomId}
                     room={room}
                     onViewDetails={() => handleViewDetails(room)}
+                    onViewMembers={() => handleViewMembersClick(room)}
                     onEdit={() => handleEditClick(room)}
                     onDelete={() => handleDeleteClick(room)}
                     onManageMembers={() => handleManageMembersClick(room)}
@@ -385,6 +394,7 @@ export default function OpportunitiesPage() {
                     key={room.roomId}
                     room={room}
                     onViewDetails={() => handleViewDetails(room)}
+                    onViewMembers={() => handleViewMembersClick(room)}
                     onEdit={() => handleEditClick(room)}
                     onDelete={() => handleDeleteClick(room)}
                     onManageMembers={() => handleManageMembersClick(room)}
@@ -488,6 +498,13 @@ export default function OpportunitiesPage() {
         onAddMembers={handleAddMembers}
         onRemoveMember={handleRemoveMember}
         isLoading={addMembersMutation.isPending || removeMemberMutation.isPending}
+      />
+
+      <DealRoomMembersModal
+        isOpen={viewMembersModalOpen}
+        onClose={() => setViewMembersModalOpen(false)}
+        room={selectedRoom}
+        onOpenManageModal={() => setManageMembersModalOpen(true)}
       />
 
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
@@ -616,6 +633,7 @@ export default function OpportunitiesPage() {
 function OpportunityCard({ 
   room,
   onViewDetails,
+  onViewMembers,
   onEdit,
   onDelete,
   onManageMembers,
@@ -627,6 +645,7 @@ function OpportunityCard({
 }: {
   room: DealRoom;
   onViewDetails: () => void;
+  onViewMembers?: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onManageMembers: () => void;
@@ -660,8 +679,13 @@ function OpportunityCard({
             <DropdownMenuItem onClick={onViewDetails}>
               <Eye className="h-4 w-4 mr-2"/> View Details
             </DropdownMenuItem>
+            {onViewMembers && (
+              <DropdownMenuItem onClick={onViewMembers}>
+                <Users className="h-4 w-4 mr-2"/> View Participating Members
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={onManageMembers}>
-              <Users className="h-4 w-4 mr-2"/> Manage Members
+              <Users className="h-4 w-4 mr-2"/> Manage Members (UUID)
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onEdit}>
               <Edit className="h-4 w-4 mr-2"/> Edit

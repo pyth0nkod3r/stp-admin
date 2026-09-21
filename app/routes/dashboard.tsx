@@ -26,8 +26,10 @@ import {
   Lock,
   ExternalLink,
   MessageSquareWarning,
+  AlertCircle,
 } from "lucide-react";
 
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { 
   Card, 
   CardContent, 
@@ -119,7 +121,7 @@ export default function AdminOverview() {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Post Moderation / Reported Posts Hook
-  const { reportedPosts, isLoading: reportedPostsLoading, refetch: refetchReportedPosts } = useReportedPosts();
+  const { reportedPosts, isLoading: reportedPostsLoading, error: reportedPostsError, refetch: refetchReportedPosts } = useReportedPosts();
   const { hidePost, unhidePost, deletePost, isHiding, isUnhiding, isDeleting } = useReportedPostMutations();
 
   // Selected post for detail modal & delete confirmation
@@ -211,20 +213,14 @@ export default function AdminOverview() {
         members: c.memberCount,
       }));
     }
-    // Fallback if byCohort is empty: display byCountry or defaults
+    // Fallback if byCohort is empty: display byCountry if available
     if (analytics?.byCountry && analytics.byCountry.length > 0) {
       return analytics.byCountry.slice(0, 6).map((c) => ({
         name: c.country,
         members: c.memberCount,
       }));
     }
-    return [
-      { name: "2021", members: 45 },
-      { name: "2022", members: 82 },
-      { name: "2023", members: 120 },
-      { name: "2024", members: 165 },
-      { name: "2025", members: 95 },
-    ];
+    return [];
   }, [analytics?.byCohort, analytics?.byCountry]);
 
   // Analytics Tab Calculations
@@ -352,6 +348,47 @@ export default function AdminOverview() {
         </Tabs>
       </div>
 
+      {/* Server Error Alerts for Easy Tracing */}
+      {dashboardError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <div className="flex-1">
+            <AlertTitle className="text-sm font-semibold">Dashboard Summary Server Error</AlertTitle>
+            <AlertDescription className="text-xs font-mono mt-0.5 break-all">
+              {dashboardError}
+            </AlertDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="h-8 text-xs border-destructive/40 hover:bg-destructive/10 shrink-0 ml-2"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
+          </Button>
+        </Alert>
+      )}
+
+      {analyticsError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <div className="flex-1">
+            <AlertTitle className="text-sm font-semibold">Platform Analytics Server Error</AlertTitle>
+            <AlertDescription className="text-xs font-mono mt-0.5 break-all">
+              {analyticsError}
+            </AlertDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchAnalytics()}
+            className="h-8 text-xs border-destructive/40 hover:bg-destructive/10 shrink-0 ml-2"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry Analytics
+          </Button>
+        </Alert>
+      )}
+
       {/* ================= SHARED FILTER TOOLBAR (WORKS FOR ALL DASHBOARD DATA) ================= */}
       <Card className="p-4 bg-card/70 backdrop-blur-md shadow-xs border border-border/80">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -476,12 +513,12 @@ export default function AdminOverview() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         {/* ================= GENERAL OVERVIEW TAB ================= */}
         <TabsContent value="overview" className="space-y-6 mt-0">
-          {/* Top Level Metrics (Connected to Live API Data) */}
+          {/* Top Level Metrics (Connected to Live API Data & Reactive to Filters) */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <MetricCard 
-              title="Total Alumni" 
-              value={summary?.totalUsers ?? analytics?.stats.totalMembers} 
-              description={`${analytics?.stats.totalCountries || 0} countries represented`} 
+              title={hasActiveFilters ? "Alumni (Filtered)" : "Total Alumni"} 
+              value={hasActiveFilters ? (analytics?.stats.totalMembers ?? summary?.totalUsers) : (summary?.totalUsers ?? analytics?.stats.totalMembers)} 
+              description={hasActiveFilters ? "Matching selected filter criteria" : `${analytics?.stats.totalCountries || 0} countries represented`} 
               icon={<Users className="h-4 w-4 text-indigo-600" />} 
               loading={loading || analyticsLoading}
             />
@@ -493,17 +530,17 @@ export default function AdminOverview() {
               loading={loading}
             />
             <MetricCard
-              title="Active Groups"
-              value={summary?.totalGroups ?? analytics?.stats.totalGroups}
-              description={`${summary?.pendingGroups || 0} pending group approval`}
+              title={hasActiveFilters ? "Groups (Filtered)" : "Active Groups"}
+              value={hasActiveFilters ? (analytics?.stats.totalGroups ?? summary?.totalGroups) : (summary?.totalGroups ?? analytics?.stats.totalGroups)}
+              description={hasActiveFilters ? "Matching selected filter criteria" : `${summary?.pendingGroups || 0} pending group approval`}
               icon={<Users className="h-4 w-4 text-amber-600" />}
               loading={loading || analyticsLoading}
               highlight={summary?.pendingGroups ? summary.pendingGroups > 0 : false}
             />
             <MetricCard 
-              title="Active Events" 
-              value={summary?.totalEvents ?? analytics?.stats.totalEvents} 
-              description={`${summary?.pendingEvents || 0} pending event approval`} 
+              title={hasActiveFilters ? "Events (Filtered)" : "Active Events"} 
+              value={hasActiveFilters ? (analytics?.stats.totalEvents ?? summary?.totalEvents) : (summary?.totalEvents ?? analytics?.stats.totalEvents)} 
+              description={hasActiveFilters ? "Matching selected filter criteria" : `${summary?.pendingEvents || 0} pending event approval`} 
               icon={<CalendarDays className="h-4 w-4 text-pink-600" />} 
               loading={loading || analyticsLoading}
               highlight={summary?.pendingEvents ? summary.pendingEvents > 0 : false}
@@ -544,6 +581,24 @@ export default function AdminOverview() {
                       <Skeleton className="h-8 w-24" />
                     </div>
                   ))}
+                </div>
+              ) : reportedPostsError ? (
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-xs flex items-center justify-between my-2">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-destructive">Server Error Loading Reported Posts</p>
+                      <p className="text-muted-foreground font-mono mt-0.5 break-all">{reportedPostsError}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchReportedPosts()}
+                    className="h-8 text-xs border-destructive/30 hover:bg-destructive/10 shrink-0 ml-3"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
+                  </Button>
                 </div>
               ) : reportedPosts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center bg-muted/20 rounded-lg border border-dashed">
@@ -694,6 +749,14 @@ export default function AdminOverview() {
                   {analyticsLoading ? (
                     <div className="h-full flex items-center justify-center">
                       <Skeleton className="h-[250px] w-full" />
+                    </div>
+                  ) : cohortDistributionData.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
+                      <GraduationCap className="h-10 w-10 text-muted-foreground/40 mb-2" />
+                      <p className="text-sm font-medium text-slate-700">No Cohort Growth Data Recorded</p>
+                      <p className="text-xs text-muted-foreground max-w-xs mt-1">
+                        There is no cohort distribution data available from the analytics service for the selected filters.
+                      </p>
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={300}>

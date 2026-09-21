@@ -231,6 +231,29 @@ export async function updateUserStatus(
   });
 }
 
+export interface EditUserPayload {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  cohort?: string;
+}
+
+export async function editUser(
+  userId: string,
+  payload: EditUserPayload
+): Promise<any> {
+  try {
+    const result = await apiRequest<any>(API_ENDPOINTS.backoffice.userById(userId), {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    return result;
+  } catch (err: any) {
+    const serverMessage = err?.message || "Failed to update user details";
+    throw new Error(`Server Error (${serverMessage})`);
+  }
+}
+
 export interface ExportUsersFilters {
   cohort?: string;
   country?: string;
