@@ -46,8 +46,59 @@ export default function SupportMessagesPage() {
   const [selectedMessage, setSelectedMessage] = useState<SupportMessage | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [stats, setStats] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  // Load messages
+  // Load global counts across all statuses
+  const loadStats = async () => {
+    try {
+      setStatsLoading(true);
+      const [allRes, pendingRes, approvedRes, rejectedRes] = await Promise.allSettled([
+        fetchSupportMessages(),
+        fetchSupportMessages("PENDING"),
+        fetchSupportMessages("APPROVED"),
+        fetchSupportMessages("REJECTED"),
+      ]);
+
+      let pending = 0;
+      let approved = 0;
+      let rejected = 0;
+
+      if (pendingRes.status === "fulfilled") {
+        pending = pendingRes.value.pagination?.totalItems ?? pendingRes.value.data.length;
+      }
+      if (approvedRes.status === "fulfilled") {
+        approved = approvedRes.value.pagination?.totalItems ?? approvedRes.value.data.length;
+      }
+      if (rejectedRes.status === "fulfilled") {
+        rejected = rejectedRes.value.pagination?.totalItems ?? rejectedRes.value.data.length;
+      }
+
+      // If specific queries didn't yield items but allRes returned messages, calculate from allRes
+      if (pending === 0 && approved === 0 && rejected === 0 && allRes.status === "fulfilled") {
+        const allData = allRes.value.data || [];
+        pending = allData.filter((m) => m.status === "PENDING").length;
+        approved = allData.filter((m) => m.status === "APPROVED").length;
+        rejected = allData.filter((m) => m.status === "REJECTED").length;
+      }
+
+      setStats({ pending, approved, rejected });
+    } catch (err) {
+      console.error("Failed to load support message stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  // Load messages for the selected table tab
   const loadMessages = async (status: string) => {
     setIsLoading(true);
     setError(null);
@@ -79,7 +130,10 @@ export default function SupportMessagesPage() {
         setSelectedMessage(null);
       }
 
-      await loadMessages(statusFilter);
+      await Promise.all([
+        loadMessages(statusFilter),
+        loadStats(),
+      ]);
     } catch (err: any) {
       toast.error(err?.message || `Failed to ${action} message`);
     } finally {
@@ -157,7 +211,7 @@ export default function SupportMessagesPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+    <div className="w-full min-w-0 space-y-6">
       {/* Header Section */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
@@ -177,10 +231,10 @@ export default function SupportMessagesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading && statusFilter === "PENDING" ? (
+              {statsLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : (
-                messages.filter((m) => m.status === "PENDING").length
+                stats.pending
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Requires admin review</p>
@@ -194,10 +248,10 @@ export default function SupportMessagesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading && statusFilter === "APPROVED" ? (
+              {statsLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : (
-                messages.filter((m) => m.status === "APPROVED").length
+                stats.approved
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Marked as approved/processed</p>
@@ -211,10 +265,10 @@ export default function SupportMessagesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {isLoading && statusFilter === "REJECTED" ? (
+              {statsLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : (
-                messages.filter((m) => m.status === "REJECTED").length
+                stats.rejected
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Declined or dismissed messages</p>
@@ -264,12 +318,12 @@ export default function SupportMessagesPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="w-[280px] pl-6">Sender</TableHead>
-                  <TableHead className="w-[200px]">Subject</TableHead>
-                  <TableHead className="hidden md:table-cell">Message Preview</TableHead>
-                  <TableHead className="w-[180px]">Date Submitted</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead className="text-right pr-6 w-[160px]">Actions</TableHead>
+                  <TableHead className="w-[180px] lg:w-[220px] pl-4">Sender</TableHead>
+                  <TableHead className="w-[120px] lg:w-[150px]">Subject</TableHead>
+                  <TableHead className="hidden md:table-cell w-[160px] lg:w-[220px]">Message Preview</TableHead>
+                  <TableHead className="w-[140px] lg:w-[160px]">Date Submitted</TableHead>
+                  <TableHead className="w-[90px] lg:w-[100px]">Status</TableHead>
+                  <TableHead className="text-right pr-4 w-[110px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -298,18 +352,18 @@ export default function SupportMessagesPage() {
                   filteredMessages.map((message) => (
                     <TableRow key={message.requestId} className="hover:bg-muted/30 transition-colors">
                       {/* Sender Name & Email */}
-                      <TableCell className="pl-6">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 border border-muted-foreground/10 shadow-sm">
+                      <TableCell className="pl-4 max-w-[180px] lg:max-w-[220px]">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Avatar className="h-8 w-8 shrink-0 border border-muted-foreground/10 shadow-sm">
                             <AvatarFallback className="bg-primary/5 text-primary text-xs font-semibold">
                               {getInitials(message.fullName)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex flex-col min-w-0">
-                            <span className="font-medium text-sm text-foreground truncate">
+                            <span className="font-medium text-sm text-foreground truncate" title={message.fullName || "Anonymous"}>
                               {message.fullName || "Anonymous"}
                             </span>
-                            <span className="text-xs text-muted-foreground truncate">
+                            <span className="text-xs text-muted-foreground truncate" title={message.email || "No email"}>
                               {message.email || "No email"}
                             </span>
                           </div>
@@ -317,33 +371,44 @@ export default function SupportMessagesPage() {
                       </TableCell>
 
                       {/* Subject */}
-                      <TableCell className="font-medium text-sm max-w-[200px] truncate text-foreground">
-                        {message.subject || "No Subject"}
+                      <TableCell className="font-medium text-sm max-w-[120px] lg:max-w-[150px] text-foreground">
+                        <div className="truncate max-w-[120px] lg:max-w-[150px]" title={message.subject || ""}>
+                          {message.subject || "No Subject"}
+                        </div>
                       </TableCell>
 
                       {/* Message Preview */}
-                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-[300px] truncate">
-                        {message.message || "—"}
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-[160px] lg:max-w-[220px]">
+                        <div 
+                          className="truncate max-w-[160px] lg:max-w-[220px]" 
+                          title={message.message || ""}
+                        >
+                          {message.message
+                            ? message.message.length > 30
+                              ? `${message.message.slice(0, 30)}...`
+                              : message.message
+                            : "—"}
+                        </div>
                       </TableCell>
 
                       {/* Submitted Date */}
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="text-xs lg:text-sm text-muted-foreground whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5" />
-                          <span>{formatDate(message.createdAt)}</span>
+                          <Calendar className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{formatDate(message.createdAt)}</span>
                         </div>
                       </TableCell>
 
                       {/* Status */}
-                      <TableCell>{getStatusBadge(message.status)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{getStatusBadge(message.status)}</TableCell>
 
                       {/* Actions */}
-                      <TableCell className="text-right pr-6">
-                        <div className="flex items-center justify-end gap-2">
+                      <TableCell className="text-right pr-4 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
                             title="View Details"
                             onClick={() => handleViewDetails(message)}
                           >
@@ -355,7 +420,7 @@ export default function SupportMessagesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+                                className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 shrink-0"
                                 title="Approve"
                                 disabled={actionLoading !== null}
                                 onClick={() => handleMessageAction(message.requestId, "approve")}
@@ -369,7 +434,7 @@ export default function SupportMessagesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-500/10"
+                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-500/10 shrink-0"
                                 title="Reject"
                                 disabled={actionLoading !== null}
                                 onClick={() => handleMessageAction(message.requestId, "reject")}

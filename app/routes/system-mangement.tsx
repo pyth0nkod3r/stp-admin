@@ -57,8 +57,10 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
+import { useAppearance, ACCENT_COLORS } from "@/hooks/useAppearance";
 
 export default function SystemManagementPage() {
+  const { isDark, accent, setAccent, toggleDarkMode, mounted } = useAppearance();
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -895,24 +897,65 @@ export default function SystemManagementPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Sun className="h-5 w-5" /> Appearance
+                  {mounted && isDark ? (
+                    <Moon className="h-5 w-5 text-indigo-400" />
+                  ) : (
+                    <Sun className="h-5 w-5 text-amber-500" />
+                  )}
+                  Appearance
                 </CardTitle>
                 <CardDescription>Personalize your dashboard experience.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label>Dark Mode</Label>
+                    <Label className="text-sm font-medium">Dark Mode</Label>
                     <p className="text-xs text-muted-foreground">Switch between light and dark themes.</p>
                   </div>
-                  <Switch />
+                  <Switch 
+                    checked={mounted ? isDark : false}
+                    onCheckedChange={(checked) => {
+                      toggleDarkMode(checked);
+                      toast.success(checked ? "Dark mode activated" : "Light mode activated");
+                    }}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label>Accent Color</Label>
-                  <div className="flex gap-2">
-                    {['bg-slate-950', 'bg-blue-600', 'bg-emerald-600', 'bg-indigo-600'].map((color) => (
-                      <button key={color} className={`h-6 w-6 rounded-full ${color} border-2 border-transparent hover:border-white`} />
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Accent Color</Label>
+                    <span className="text-xs font-semibold text-muted-foreground capitalize">
+                      {ACCENT_COLORS.find((c) => c.id === accent)?.label || accent}
+                    </span>
+                  </div>
+                  <div className="flex gap-2.5 pt-1">
+                    {ACCENT_COLORS.map((color) => {
+                      const isSelected = accent === color.id;
+                      return (
+                        <button
+                          key={color.id}
+                          type="button"
+                          onClick={() => {
+                            setAccent(color.id);
+                            toast.success(`Theme accent set to ${color.label}`);
+                          }}
+                          className={cn(
+                            "relative h-7 w-7 rounded-full flex items-center justify-center transition-all shadow-xs",
+                            color.bgClass,
+                            isSelected 
+                              ? "ring-2 ring-offset-2 ring-primary scale-110 shadow-md" 
+                              : "hover:scale-105 opacity-85 hover:opacity-100"
+                          )}
+                          title={color.label}
+                        >
+                          {isSelected && (
+                            <Check className={cn(
+                              "h-3.5 w-3.5",
+                              color.id === "slate" ? "text-white dark:text-black" : "text-white"
+                            )} />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>

@@ -43,10 +43,36 @@ const queryClient = new QueryClient({
   },
 });
 
+import { ThemeProvider } from "next-themes";
+import { useEffect } from "react";
+import { applyAccentColor, type AccentColor } from "./hooks/useAppearance";
+
+function AppearanceInitializer() {
+  useEffect(() => {
+    const savedAccent = (localStorage.getItem("stp_accent_color") as AccentColor) || "slate";
+    const isDark = document.documentElement.classList.contains("dark");
+    applyAccentColor(savedAccent, isDark);
+
+    const observer = new MutationObserver(() => {
+      const isCurrentlyDark = document.documentElement.classList.contains("dark");
+      applyAccentColor((localStorage.getItem("stp_accent_color") as AccentColor) || "slate", isCurrentlyDark);
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return null;
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -54,26 +80,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body suppressHydrationWarning={true}>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            {/* <SidebarProvider>
-              <div className="flex min-h-screen w-full">
-                <AppSidebar />
-                <main className="flex-1 flex flex-col">
-                  <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-6">
-                    <SidebarTrigger />
-                  </header>
-
-                  <div className="flex-1 p-6 md:p-8 lg:p-10">
-                  </div>
-                  </main>
-                  </div>
-                  </SidebarProvider> */}
-            {children}
-          </TooltipProvider>
-          <ReactQueryDevtools initialIsOpen={false} />
-        </QueryClientProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          <AppearanceInitializer />
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Toaster />
+              {children}
+            </TooltipProvider>
+            <ReactQueryDevtools initialIsOpen={false} />
+          </QueryClientProvider>
+        </ThemeProvider>
         <ScrollRestoration />
         <Scripts />
       </body>
