@@ -160,22 +160,22 @@ export default function AdminOverview() {
     }
   }, [analytics]);
 
-  const defaultCountries = ["Nigeria", "Ghana", "Kenya", "South Africa", "United Kingdom", "United States"];
-  const defaultSectors = ["Technology", "Agriculture", "Finance", "Healthcare", "Education", "Energy"];
-
   const cohortList = useMemo(() => {
-    if (filtersData?.cohorts && filtersData.cohorts.length > 0) return filtersData.cohorts;
-    return ["2021", "2022", "2023", "2024", "2025", "2026"];
-  }, [filtersData]);
+    // Prefer exact cohort names from analytics (which comes from real DB values) + filtersData
+    const fromAnalytics = analytics?.byCohort?.map((c) => String(c.cohort).trim()).filter(Boolean) || [];
+    const fromFilters = filtersData?.cohorts?.map((c) => String(c).trim()).filter(Boolean) || [];
+    const combined = Array.from(new Set([...fromAnalytics, ...fromFilters]));
+    return combined;
+  }, [filtersData, analytics?.byCohort]);
 
   const countryList = useMemo(() => {
     if (filtersData?.countries && filtersData.countries.length > 0) return filtersData.countries;
-    return availableCountries.length > 0 ? availableCountries : defaultCountries;
+    return availableCountries;
   }, [filtersData, availableCountries]);
 
   const sectorList = useMemo(() => {
     if (filtersData?.sectors && filtersData.sectors.length > 0) return filtersData.sectors;
-    return availableSectors.length > 0 ? availableSectors : defaultSectors;
+    return availableSectors;
   }, [filtersData, availableSectors]);
 
   const timeframeList = useMemo(() => {
@@ -205,23 +205,88 @@ export default function AdminOverview() {
     { name: "Pending Verification", value: pendingCount, color: "#f97316" },
   ];
 
-  // Dynamic Cohort Distribution data from backend analytics
+  // Dynamic Cohort Distribution data from backend analytics (with selection highlight)
   const cohortDistributionData = useMemo(() => {
     if (analytics?.byCohort && analytics.byCohort.length > 0) {
       return analytics.byCohort.map((c) => ({
-        name: `Class of ${c.cohort}`,
+        name: c.cohort,
         members: c.memberCount,
-      }));
-    }
-    // Fallback if byCohort is empty: display byCountry if available
-    if (analytics?.byCountry && analytics.byCountry.length > 0) {
-      return analytics.byCountry.slice(0, 6).map((c) => ({
-        name: c.country,
-        members: c.memberCount,
+        isSelected: Boolean(filters.cohort && filters.cohort !== "all" && c.cohort.toLowerCase() === filters.cohort.toLowerCase()),
       }));
     }
     return [];
-  }, [analytics?.byCohort, analytics?.byCountry]);
+  }, [analytics?.byCohort, filters.cohort]);
+
+  // Computed filtered alumni metric based on user selection & backend analytics payload
+  const filteredAlumniMetric = useMemo(() => {
+    const totalGlobal = analytics?.stats.totalMembers ?? summary?.totalUsers ?? 0;
+
+    // 1. Timeframe filter active -> Backend returns newMembersInPeriod
+    if (filters.timeframe && filters.timeframe !== "all") {
+      const newMembers = analytics?.stats.newMembersInPeriod ?? 0;
+      const tfOption = timeframeList.find((t) => String(t.value) === String(filters.timeframe));
+      const tfLabel = tfOption?.label ?? `Last ${filters.timeframe} days`;
+      return {
+        title: `New Alumni (${tfLabel})`,
+        value: newMembers,
+        badge: `+${newMembers} in period`,
+        description: `${newMembers} new alumni joined in ${tfLabel.toLowerCase()} (out of ${totalGlobal} total)`,
+      };
+    }
+
+    // 2. Country filter active -> Backend returns byCountry matching that country
+    if (filters.country && filters.country !== "all") {
+      const match = analytics?.byCountry.find(
+        (c) => c.country.toLowerCase() === filters.country!.toLowerCase()
+      );
+      const count = match ? match.memberCount : (analytics?.byCountry.length === 1 ? analytics.byCountry[0].memberCount : 0);
+      const pct = totalGlobal > 0 ? Math.round((count / totalGlobal) * 100) : 0;
+      return {
+        title: `Alumni in ${filters.country}`,
+        value: count,
+        badge: `${pct}% of total`,
+        description: `${count} alumni located in ${filters.country} (${pct}% of ${totalGlobal} network total)`,
+      };
+    }
+
+    // 3. Sector filter active -> Backend returns bySector matching that sector
+    if (filters.sector && filters.sector !== "all") {
+      const match = analytics?.bySector.find(
+        (s) => s.sector.toLowerCase() === filters.sector!.toLowerCase()
+      );
+      const count = match ? match.memberCount : (analytics?.bySector.length === 1 ? analytics.bySector[0].memberCount : 0);
+      const pct = totalGlobal > 0 ? Math.round((count / totalGlobal) * 100) : 0;
+      return {
+        title: `Alumni in ${filters.sector}`,
+        value: count,
+        badge: `${pct}% of total`,
+        description: `${count} alumni work in ${filters.sector} (${pct}% of ${totalGlobal} network total)`,
+      };
+    }
+
+    // 4. Cohort filter active -> Backend returns byCohort matching that cohort
+    if (filters.cohort && filters.cohort !== "all") {
+      const match = analytics?.byCohort.find(
+        (c) => c.cohort.toLowerCase() === filters.cohort!.toLowerCase()
+      );
+      const count = match ? match.memberCount : 0;
+      const pct = totalGlobal > 0 ? Math.round((count / totalGlobal) * 100) : 0;
+      return {
+        title: `Alumni in ${filters.cohort}`,
+        value: count,
+        badge: `${pct}% of total`,
+        description: `${count} members in cohort ${filters.cohort} (${pct}% of ${totalGlobal} network total)`,
+      };
+    }
+
+    // Default: Unfiltered global summary
+    return {
+      title: "Total Alumni",
+      value: summary?.totalUsers ?? analytics?.stats.totalMembers ?? 0,
+      badge: null,
+      description: `${analytics?.stats.totalCountries || 0} countries represented`,
+    };
+  }, [filters, analytics, summary, timeframeList]);
 
   // Analytics Tab Calculations
   const countryData = useMemo(() => {
@@ -358,14 +423,6 @@ export default function AdminOverview() {
               {dashboardError}
             </AlertDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            className="h-8 text-xs border-destructive/40 hover:bg-destructive/10 shrink-0 ml-2"
-          >
-            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
-          </Button>
         </Alert>
       )}
 
@@ -378,14 +435,6 @@ export default function AdminOverview() {
               {analyticsError}
             </AlertDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetchAnalytics()}
-            className="h-8 text-xs border-destructive/40 hover:bg-destructive/10 shrink-0 ml-2"
-          >
-            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry Analytics
-          </Button>
         </Alert>
       )}
 
@@ -409,7 +458,9 @@ export default function AdminOverview() {
                   <SelectItem value="all">All Cohorts</SelectItem>
                   {cohortList.map((c) => (
                     <SelectItem key={c} value={c}>
-                      Cohort {c}
+                      {c.toLowerCase().startsWith("cohort") || c.toLowerCase().startsWith("stp") || c.toLowerCase().startsWith("stf")
+                        ? c
+                        : `Cohort ${c}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -508,6 +559,73 @@ export default function AdminOverview() {
             </Button>
           </div>
         </div>
+
+        {/* Active Filter Chips Bar */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-border/60">
+            <span className="text-xs font-semibold text-muted-foreground">Active Filter{filters.cohort !== "all" || filters.country !== "all" || filters.sector !== "all" || filters.timeframe !== "all" ? "s" : ""}:</span>
+            {filters.cohort !== "all" && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200">
+                Cohort: {filters.cohort}
+                <button
+                  type="button"
+                  onClick={() => handleFilterChange("cohort", "all")}
+                  className="hover:bg-indigo-200/60 dark:hover:bg-indigo-800 rounded-full p-0.5 inline-flex items-center justify-center"
+                  title="Clear cohort filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            {filters.country !== "all" && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200">
+                Country: {filters.country}
+                <button
+                  type="button"
+                  onClick={() => handleFilterChange("country", "all")}
+                  className="hover:bg-emerald-200/60 dark:hover:bg-emerald-800 rounded-full p-0.5 inline-flex items-center justify-center"
+                  title="Clear country filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            {filters.sector !== "all" && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200">
+                Sector: {filters.sector}
+                <button
+                  type="button"
+                  onClick={() => handleFilterChange("sector", "all")}
+                  className="hover:bg-amber-200/60 dark:hover:bg-amber-800 rounded-full p-0.5 inline-flex items-center justify-center"
+                  title="Clear sector filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            {filters.timeframe !== "all" && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300 border-pink-200">
+                Timeframe: {timeframeList.find((t) => String(t.value) === String(filters.timeframe))?.label || `${filters.timeframe} days`}
+                <button
+                  type="button"
+                  onClick={() => handleFilterChange("timeframe", "all")}
+                  className="hover:bg-pink-200/60 dark:hover:bg-pink-800 rounded-full p-0.5 inline-flex items-center justify-center"
+                  title="Clear timeframe filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilters}
+              className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Clear All
+            </Button>
+          </div>
+        )}
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -516,34 +634,35 @@ export default function AdminOverview() {
           {/* Top Level Metrics (Connected to Live API Data & Reactive to Filters) */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <MetricCard 
-              title={hasActiveFilters ? "Alumni (Filtered)" : "Total Alumni"} 
-              value={hasActiveFilters ? (analytics?.stats.totalMembers ?? summary?.totalUsers) : (summary?.totalUsers ?? analytics?.stats.totalMembers)} 
-              description={hasActiveFilters ? "Matching selected filter criteria" : `${analytics?.stats.totalCountries || 0} countries represented`} 
+              title={filteredAlumniMetric.title} 
+              value={filteredAlumniMetric.value} 
+              badge={filteredAlumniMetric.badge}
+              description={filteredAlumniMetric.description} 
               icon={<Users className="h-4 w-4 text-indigo-600" />} 
               loading={loading || analyticsLoading}
             />
             <MetricCard 
-              title="Active Alumni" 
+              title={hasActiveFilters ? "Active Alumni (Global)" : "Active Alumni"} 
               value={summary?.activeUsers} 
-              description={`${summary?.totalUsers ? Math.round(((summary.activeUsers || 0) / summary.totalUsers) * 100) : 0}% active engagement rate`} 
+              description={hasActiveFilters ? `${summary?.activeUsers || 0} active platform-wide (global baseline)` : `${summary?.totalUsers ? Math.round(((summary.activeUsers || 0) / summary.totalUsers) * 100) : 0}% active engagement rate`} 
               icon={<Zap className="h-4 w-4 text-emerald-600" />} 
               loading={loading}
             />
             <MetricCard
-              title={hasActiveFilters ? "Groups (Filtered)" : "Active Groups"}
-              value={hasActiveFilters ? (analytics?.stats.totalGroups ?? summary?.totalGroups) : (summary?.totalGroups ?? analytics?.stats.totalGroups)}
-              description={hasActiveFilters ? "Matching selected filter criteria" : `${summary?.pendingGroups || 0} pending group approval`}
+              title="Active Groups"
+              value={summary?.totalGroups ?? analytics?.stats.totalGroups ?? 0}
+              description={hasActiveFilters ? `${analytics?.stats.totalGroups || 0} active groups platform-wide (global)` : `${summary?.pendingGroups || 0} pending group approval`}
               icon={<Users className="h-4 w-4 text-amber-600" />}
               loading={loading || analyticsLoading}
-              highlight={summary?.pendingGroups ? summary.pendingGroups > 0 : false}
+              highlight={!hasActiveFilters && summary?.pendingGroups ? summary.pendingGroups > 0 : false}
             />
             <MetricCard 
-              title={hasActiveFilters ? "Events (Filtered)" : "Active Events"} 
-              value={hasActiveFilters ? (analytics?.stats.totalEvents ?? summary?.totalEvents) : (summary?.totalEvents ?? analytics?.stats.totalEvents)} 
-              description={hasActiveFilters ? "Matching selected filter criteria" : `${summary?.pendingEvents || 0} pending event approval`} 
+              title="Active Events" 
+              value={summary?.totalEvents ?? analytics?.stats.totalEvents ?? 0} 
+              description={hasActiveFilters ? `${analytics?.stats.totalEvents || 0} active events platform-wide (global)` : `${summary?.pendingEvents || 0} pending event approval`} 
               icon={<CalendarDays className="h-4 w-4 text-pink-600" />} 
               loading={loading || analyticsLoading}
-              highlight={summary?.pendingEvents ? summary.pendingEvents > 0 : false}
+              highlight={!hasActiveFilters && summary?.pendingEvents ? summary.pendingEvents > 0 : false}
             />
           </div>
 
@@ -591,14 +710,6 @@ export default function AdminOverview() {
                       <p className="text-muted-foreground font-mono mt-0.5 break-all">{reportedPostsError}</p>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => refetchReportedPosts()}
-                    className="h-8 text-xs border-destructive/30 hover:bg-destructive/10 shrink-0 ml-3"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
-                  </Button>
                 </div>
               ) : reportedPosts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center bg-muted/20 rounded-lg border border-dashed">
@@ -768,7 +879,20 @@ export default function AdminOverview() {
                           cursor={{ fill: '#f1f5f9' }}
                           contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
                         />
-                        <Bar dataKey="members" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="members" radius={[4, 4, 0, 0]}>
+                          {cohortDistributionData.map((entry, index) => (
+                            <Cell
+                              key={`cohort-cell-${index}`}
+                              fill={
+                                filters.cohort !== "all"
+                                  ? entry.isSelected
+                                    ? "#4f46e5"
+                                    : "#cbd5e1"
+                                  : "#4f46e5"
+                              }
+                            />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -779,8 +903,19 @@ export default function AdminOverview() {
             {/* Alumni Verification Distribution */}
             <Card className="col-span-3">
               <CardHeader>
-                <CardTitle>Alumni Distribution</CardTitle>
-                <CardDescription>Verified vs. Pending Verification</CardDescription>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Alumni Distribution</CardTitle>
+                  {hasActiveFilters && (
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono">
+                      Global Baseline
+                    </Badge>
+                  )}
+                </div>
+                <CardDescription>
+                  {hasActiveFilters 
+                    ? `Verified vs. Pending (Global baseline; ${analytics?.stats.totalMembers ?? 0} in active filter)` 
+                    : "Verified vs. Pending Verification"}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {usersLoading ? (
@@ -935,34 +1070,42 @@ export default function AdminOverview() {
           {/* Metric Cards Row */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <MetricCard
-              title="Total Active Members"
-              value={summary?.activeUsers}
-              description={`${analytics?.stats.totalCountries || 0} Countries Represented`}
+              title={hasActiveFilters ? filteredAlumniMetric.title : "Total Alumni"}
+              value={filteredAlumniMetric.value}
+              badge={filteredAlumniMetric.badge}
+              description={filteredAlumniMetric.description}
               icon={<Users className="h-4 w-4 text-indigo-600" />}
               loading={loading || analyticsLoading}
             />
             <MetricCard
-              title="Onboarded Members"
+              title={filters.country !== "all" ? "Selected Region" : "Active Regions"}
+              value={filters.country !== "all" ? 1 : (hasActiveFilters ? (analytics?.byCountry?.length || 0) : (analytics?.stats.totalCountries || 0))}
+              badge={filters.country !== "all" ? filters.country : undefined}
+              description={
+                filters.country !== "all"
+                  ? `Showing data for ${filters.country} (out of ${analytics?.stats.totalCountries || 27} global regions)`
+                  : hasActiveFilters
+                  ? `${analytics?.byCountry?.length || 0} regions with members matching active filters`
+                  : `${analytics?.stats.totalCountries || 0} countries represented globally`
+              }
+              icon={<Globe className="h-4 w-4 text-emerald-600" />}
+              loading={analyticsLoading}
+            />
+            <MetricCard
+              title="Onboarded Alumni"
               value={analytics?.stats.onboardedMembers}
               description={`${
                 analytics?.stats.totalMembers
                   ? Math.round((analytics.stats.onboardedMembers / analytics.stats.totalMembers) * 100)
                   : 0
-              }% Onboarding Rate`}
-              icon={<Award className="h-4 w-4 text-emerald-600" />}
+              }% Global Onboarding Rate`}
+              icon={<Award className="h-4 w-4 text-amber-600" />}
               loading={analyticsLoading}
             />
             <MetricCard
-              title="Groups & Deal Rooms"
-              value={analyticsLoading ? null : `${analytics?.stats.totalGroups || 0} / ${analytics?.stats.totalDealRooms || 0}`}
-              description="Active Groups / Deal Rooms"
-              icon={<Briefcase className="h-4 w-4 text-amber-600" />}
-              loading={analyticsLoading}
-            />
-            <MetricCard
-              title="Engagement Hub"
-              value={analyticsLoading ? null : `${analytics?.stats.totalPosts || 0} / ${analytics?.stats.totalEvents || 0}`}
-              description="Total Posts / Events"
+              title="Community Hubs"
+              value={analyticsLoading ? null : `${analytics?.stats.totalGroups || 0} Groups / ${analytics?.stats.totalDealRooms || 0} Deal Rooms`}
+              description={`${analytics?.stats.totalPosts || 0} Posts & ${analytics?.stats.totalEvents || 0} Events`}
               icon={<TrendingUp className="h-4 w-4 text-pink-600" />}
               loading={analyticsLoading}
             />
@@ -1379,11 +1522,34 @@ export default function AdminOverview() {
   );
 }
 
-function MetricCard({ title, value, description, icon, highlight = false, loading = false }: any) {
+function MetricCard({
+  title,
+  value,
+  description,
+  icon,
+  badge,
+  highlight = false,
+  loading = false,
+}: {
+  title: string;
+  value: any;
+  description: string;
+  icon: React.ReactNode;
+  badge?: string | null;
+  highlight?: boolean;
+  loading?: boolean;
+}) {
   return (
-    <Card className={highlight ? "border-orange-200 bg-orange-50/30" : ""}>
+    <Card className={highlight ? "border-orange-200 bg-orange-50/30 dark:bg-orange-950/20" : ""}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium leading-normal min-h-[40px]">{title}</CardTitle>
+        <div className="space-y-1 pr-2 min-h-[40px]">
+          <CardTitle className="text-sm font-medium leading-normal">{title}</CardTitle>
+          {badge && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-medium">
+              {badge}
+            </Badge>
+          )}
+        </div>
         <div className="flex-shrink-0">
           {icon}
         </div>
@@ -1392,7 +1558,9 @@ function MetricCard({ title, value, description, icon, highlight = false, loadin
         {loading ? (
           <Skeleton className="h-8 w-16 mb-1" />
         ) : (
-          <div className="text-2xl font-bold">{value !== null && value !== undefined ? value.toLocaleString() : 0}</div>
+          <div className="text-2xl font-bold">
+            {typeof value === "number" ? value.toLocaleString() : (value !== null && value !== undefined ? value : 0)}
+          </div>
         )}
         <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </CardContent>

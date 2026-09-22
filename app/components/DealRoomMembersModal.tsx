@@ -97,14 +97,6 @@ export const DealRoomMembersModal: React.FC<DealRoomMembersModalProps> = ({
                 {error}
               </AlertDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={loadMembers}
-              className="h-8 text-xs border-destructive/40 hover:bg-destructive/10 shrink-0 ml-2"
-            >
-              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
-            </Button>
           </Alert>
         )}
 

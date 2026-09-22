@@ -48,7 +48,7 @@ const mainItems: SidebarItem[] = [
     icon: UserPlus,
     roles: ["BACKOFFICE", "ADMIN"],
   },
-  { title: "Support Messages", url: "/admin/support-messages", icon: Inbox },
+  { title: "Support & Inquiries", url: "/admin/support-messages", icon: Inbox },
   { title: "System & Management", url: "/admin/system", icon: Settings },
   // { title: "Contacts", url: "/admin/contacts", icon: Contact },
 ];
