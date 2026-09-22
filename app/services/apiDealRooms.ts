@@ -6,12 +6,17 @@ export interface DealRoom {
   roomName: string;
   roomDescription: string;
   isActive: string;
+  status?: string;
+  isLocked?: boolean;
   createdAt: string;
+  createdBy?: string;
   firstName: string;
   lastName: string;
   createdByEmail: string;
   memberCount: number;
-  documentUrl: string;
+  documentUrl: string | null;
+  members?: DealRoomMember[];
+  hasSignedNda?: boolean;
 }
 
 export type DealRoomModerationAction = "approve" | "reject";
@@ -32,7 +37,33 @@ export const apiDealRooms = {
     const result = await apiRequest<DealRoomsResponse>(API_ENDPOINTS.dealrooms.list, {
       method: "GET",
     });
-    return result.data ?? [];
+    const rooms = result.data ?? [];
+    if (!rooms.length) return [];
+
+    // For each room, fetch individual detail from /dealrooms/:roomId to resolve true member count
+    const enriched = await Promise.all(
+      rooms.map(async (room) => {
+        try {
+          const detail = await apiDealRooms.fetchDealRoom(room.roomId);
+          if (detail) {
+            const count = Array.isArray(detail.members)
+              ? detail.members.length
+              : typeof detail.memberCount === "number"
+              ? detail.memberCount
+              : room.memberCount;
+            return {
+              ...room,
+              ...detail,
+              memberCount: count,
+            };
+          }
+        } catch {
+          // Fallback to room summary if detail fetch fails
+        }
+        return room;
+      })
+    );
+    return enriched;
   },
 
   async fetchPendingDealRooms(): Promise<DealRoom[]> {
@@ -42,17 +73,46 @@ export const apiDealRooms = {
         method: "GET",
       }
     );
-    return result.data ?? [];
+    const rooms = result.data ?? [];
+    if (!rooms.length) return [];
+
+    const enriched = await Promise.all(
+      rooms.map(async (room) => {
+        try {
+          const detail = await apiDealRooms.fetchDealRoom(room.roomId);
+          if (detail) {
+            const count = Array.isArray(detail.members)
+              ? detail.members.length
+              : typeof detail.memberCount === "number"
+              ? detail.memberCount
+              : room.memberCount;
+            return {
+              ...room,
+              ...detail,
+              memberCount: count,
+            };
+          }
+        } catch {
+          // Fallback to room summary
+        }
+        return room;
+      })
+    );
+    return enriched;
   },
 
   async fetchDealRoom(roomId: string): Promise<DealRoom> {
-    const result = await apiRequest<{ status: boolean; data: DealRoom }>(
+    const result = await apiRequest<{ status: boolean; data: any }>(
       API_ENDPOINTS.dealrooms.byId(roomId),
       {
         method: "GET",
       }
     );
-    return result.data;
+    const room = result.data;
+    if (room && Array.isArray(room.members)) {
+      room.memberCount = room.members.length;
+    }
+    return room;
   },
 
   async createDealRoom(roomData: {

@@ -17,7 +17,9 @@ import {
   Edit,
   Trash2,
   Eye,
-  History
+  History,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,19 +34,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useDealRooms } from "@/hooks/useDealRoomsNew";
+import type { DealRoom } from "@/services/apiDealRooms";
 
-type DealRoom = {
-  roomId: string;
-  roomName: string;
-  roomDescription: string;
-  isActive: string;
-  createdAt: string;
-  firstName: string;
-  lastName: string;
-  createdByEmail: string;
-  memberCount: number;
-  documentUrl: string;
-};
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -253,13 +244,25 @@ export default function OpportunitiesPage() {
       });
       setLockDialogOpen(false);
       setLockRoomReason("");
+      setSelectedRoom(undefined);
     }
   };
+
+  const ITEMS_PER_PAGE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTab]);
 
   const activeRooms = dealRooms.filter(room => room.isActive === "1");
   const totalVolume = activeRooms.length > 0 ? "$" + (activeRooms.length * 1.5).toFixed(1) + "M" : "$0";
   const activeRequests = activeRooms.reduce((sum, room) => sum + room.memberCount, 0);
   const totalMembers = dealRooms.reduce((sum, room) => sum + room.memberCount, 0);
+
+  const paginatedActiveRooms = activeRooms.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const paginatedAllRooms = dealRooms.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const paginatedPendingRooms = pendingDealRooms.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -343,68 +346,98 @@ export default function OpportunitiesPage() {
           </div>
         ) : (
           <>
-            <TabsContent value="active" className="grid gap-4 md:grid-cols-2">
+            <TabsContent value="active" className="space-y-4">
               {activeRooms.length > 0 ? (
-                activeRooms.map((room) => (
-                  <OpportunityCard 
-                    key={room.roomId}
-                    room={room}
-                    onViewDetails={() => handleViewDetails(room)}
-                    onViewMembers={() => handleViewMembersClick(room)}
-                    onEdit={() => handleEditClick(room)}
-                    onDelete={() => handleDeleteClick(room)}
-                    onManageMembers={() => handleManageMembersClick(room)}
-                    onViewAudit={() => handleViewAuditLog(room)}
-                    onLockUnlock={() => handleLockClick(room)}
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {paginatedActiveRooms.map((room) => (
+                      <OpportunityCard 
+                        key={room.roomId}
+                        room={room}
+                        onViewDetails={() => handleViewDetails(room)}
+                        onViewMembers={() => handleViewMembersClick(room)}
+                        onEdit={() => handleEditClick(room)}
+                        onDelete={() => handleDeleteClick(room)}
+                        onManageMembers={() => handleManageMembersClick(room)}
+                        onViewAudit={() => handleViewAuditLog(room)}
+                        onLockUnlock={() => handleLockClick(room)}
+                      />
+                    ))}
+                  </div>
+                  <PaginationControls
+                    currentPage={currentPage}
+                    totalItems={activeRooms.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setCurrentPage}
                   />
-                ))
+                </>
               ) : (
-                <div className="col-span-2 text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground">
                   <p>No active dealrooms found</p>
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="all" className="grid gap-4 md:grid-cols-2">
+            <TabsContent value="all" className="space-y-4">
               {dealRooms.length > 0 ? (
-                dealRooms.map((room) => (
-                  <OpportunityCard 
-                    key={room.roomId}
-                    room={room}
-                    onViewDetails={() => handleViewDetails(room)}
-                    onViewMembers={() => handleViewMembersClick(room)}
-                    onEdit={() => handleEditClick(room)}
-                    onDelete={() => handleDeleteClick(room)}
-                    onManageMembers={() => handleManageMembersClick(room)}
-                    onViewAudit={() => handleViewAuditLog(room)}
-                    onLockUnlock={() => handleLockClick(room)}
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {paginatedAllRooms.map((room) => (
+                      <OpportunityCard 
+                        key={room.roomId}
+                        room={room}
+                        onViewDetails={() => handleViewDetails(room)}
+                        onViewMembers={() => handleViewMembersClick(room)}
+                        onEdit={() => handleEditClick(room)}
+                        onDelete={() => handleDeleteClick(room)}
+                        onManageMembers={() => handleManageMembersClick(room)}
+                        onViewAudit={() => handleViewAuditLog(room)}
+                        onLockUnlock={() => handleLockClick(room)}
+                      />
+                    ))}
+                  </div>
+                  <PaginationControls
+                    currentPage={currentPage}
+                    totalItems={dealRooms.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setCurrentPage}
                   />
-                ))
+                </>
               ) : (
-                <div className="col-span-2 text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground">
                   <p>No dealrooms found</p>
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="pending" className="grid gap-4 md:grid-cols-2">
+            <TabsContent value="pending" className="space-y-4">
               {pendingDealRooms.length > 0 ? (
-                pendingDealRooms.map((room) => (
-                  <OpportunityCard
-                    key={room.roomId}
-                    room={room}
-                    onViewDetails={() => handleViewDetails(room)}
-                    onViewMembers={() => handleViewMembersClick(room)}
-                    onEdit={() => handleEditClick(room)}
-                    onDelete={() => handleDeleteClick(room)}
-                    onManageMembers={() => handleManageMembersClick(room)}
-                    onApprove={() => handleApproveOpportunity(room.roomId)}
-                    onReject={() => handleRejectClick(room)}
-                    isModerating={approveMutation.isPending || rejectMutation.isPending}
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {paginatedPendingRooms.map((room) => (
+                      <OpportunityCard
+                        key={room.roomId}
+                        room={room}
+                        onViewDetails={() => handleViewDetails(room)}
+                        onViewMembers={() => handleViewMembersClick(room)}
+                        onEdit={() => handleEditClick(room)}
+                        onDelete={() => handleDeleteClick(room)}
+                        onManageMembers={() => handleManageMembersClick(room)}
+                        onApprove={() => handleApproveOpportunity(room.roomId)}
+                        onReject={() => handleRejectClick(room)}
+                        isModerating={approveMutation.isPending || rejectMutation.isPending}
+                      />
+                    ))}
+                  </div>
+                  <PaginationControls
+                    currentPage={currentPage}
+                    totalItems={pendingDealRooms.length}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={setCurrentPage}
                   />
-                ))
+                </>
               ) : (
-                <div className="col-span-2 text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground">
                   <ShieldCheck className="h-8 w-8 mx-auto mb-3 opacity-60" />
                   <p>No pending dealrooms found</p>
                 </div>
@@ -505,6 +538,7 @@ export default function OpportunitiesPage() {
         onClose={() => setViewMembersModalOpen(false)}
         room={selectedRoom}
         onOpenManageModal={() => setManageMembersModalOpen(true)}
+        onRemoveMember={handleRemoveMember}
       />
 
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
@@ -630,6 +664,72 @@ export default function OpportunitiesPage() {
   );
 }
 
+interface PaginationControlsProps {
+  currentPage: number;
+  totalItems: number;
+  itemsPerPage: number;
+  onPageChange: (page: number) => void;
+}
+
+function PaginationControls({
+  currentPage,
+  totalItems,
+  itemsPerPage,
+  onPageChange,
+}: PaginationControlsProps) {
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  if (totalItems <= itemsPerPage) return null;
+
+  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t mt-4">
+      <p className="text-xs text-muted-foreground">
+        Showing <span className="font-semibold text-foreground">{startItem}</span> to{" "}
+        <span className="font-semibold text-foreground">{endItem}</span> of{" "}
+        <span className="font-semibold text-foreground">{totalItems}</span> Deal Rooms
+      </p>
+
+      <div className="flex items-center gap-1.5">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
+          disabled={currentPage <= 1}
+          className="h-8 px-2.5 text-xs"
+        >
+          <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Previous
+        </Button>
+
+        <div className="flex items-center gap-1">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+            <Button
+              key={pageNum}
+              variant={pageNum === currentPage ? "default" : "outline"}
+              size="sm"
+              onClick={() => onPageChange(pageNum)}
+              className="h-8 w-8 p-0 text-xs font-medium"
+            >
+              {pageNum}
+            </Button>
+          ))}
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
+          disabled={currentPage >= totalPages}
+          className="h-8 px-2.5 text-xs"
+        >
+          Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function OpportunityCard({ 
   room,
   onViewDetails,
@@ -685,7 +785,7 @@ function OpportunityCard({
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={onManageMembers}>
-              <Users className="h-4 w-4 mr-2"/> Manage Members (UUID)
+              <Users className="h-4 w-4 mr-2"/> Manage Members
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onEdit}>
               <Edit className="h-4 w-4 mr-2"/> Edit

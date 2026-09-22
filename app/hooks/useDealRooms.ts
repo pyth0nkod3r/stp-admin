@@ -86,6 +86,7 @@ export const useDealRooms = () => {
       apiDealRooms.addMembersToRoom(roomId, members),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dealRooms"] });
+      queryClient.invalidateQueries({ queryKey: ["dealRoomMembers"] });
       toast.success("Members added successfully!");
     },
     onError: (error: Error) => {
@@ -98,6 +99,7 @@ export const useDealRooms = () => {
       apiDealRooms.removeMemberFromRoom(roomId, userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dealRooms"] });
+      queryClient.invalidateQueries({ queryKey: ["dealRoomMembers"] });
       toast.success("Member removed successfully!");
     },
     onError: (error: Error) => {
