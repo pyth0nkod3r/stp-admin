@@ -21,6 +21,8 @@ import {
   AlertCircle,
   RefreshCw,
   UserPlus,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { apiDealRooms, type DealRoom, type DealRoomMember } from "@/services/apiDealRooms";
 
@@ -29,6 +31,7 @@ interface DealRoomMembersModalProps {
   onClose: () => void;
   room?: DealRoom;
   onOpenManageModal?: () => void;
+  onRemoveMember?: (userId: string) => Promise<void>;
 }
 
 export const DealRoomMembersModal: React.FC<DealRoomMembersModalProps> = ({
@@ -36,10 +39,24 @@ export const DealRoomMembersModal: React.FC<DealRoomMembersModalProps> = ({
   onClose,
   room,
   onOpenManageModal,
+  onRemoveMember,
 }) => {
   const [members, setMembers] = useState<DealRoomMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+
+  const handleRemove = async (userId: string, name: string) => {
+    if (!onRemoveMember) return;
+    if (!window.confirm(`Are you sure you want to remove ${name} from this deal room?`)) return;
+    try {
+      setRemovingUserId(userId);
+      await onRemoveMember(userId);
+      setMembers((prev) => prev.filter((m) => m.userId !== userId));
+    } finally {
+      setRemovingUserId(null);
+    }
+  };
 
   const loadMembers = async () => {
     if (!room?.roomId) return;
@@ -97,14 +114,6 @@ export const DealRoomMembersModal: React.FC<DealRoomMembersModalProps> = ({
                 {error}
               </AlertDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={loadMembers}
-              className="h-8 text-xs border-destructive/40 hover:bg-destructive/10 shrink-0 ml-2"
-            >
-              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
-            </Button>
           </Alert>
         )}
 
@@ -145,7 +154,7 @@ export const DealRoomMembersModal: React.FC<DealRoomMembersModalProps> = ({
                   }}
                   className="mt-4 text-xs"
                 >
-                  <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Add Members by ID
+                  <UserPlus className="h-3.5 w-3.5 mr-1.5" /> + Add Members
                 </Button>
               )}
             </div>
@@ -159,6 +168,7 @@ export const DealRoomMembersModal: React.FC<DealRoomMembersModalProps> = ({
                     <th className="px-4 py-3">Location</th>
                     <th className="px-4 py-3">Organization / Role</th>
                     <th className="px-4 py-3">Joined Date</th>
+                    {onRemoveMember && <th className="px-4 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -221,6 +231,24 @@ export const DealRoomMembersModal: React.FC<DealRoomMembersModalProps> = ({
                             {formattedDate}
                           </span>
                         </td>
+                        {onRemoveMember && (
+                          <td className="px-4 py-3 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={removingUserId === member.userId}
+                              onClick={() => handleRemove(member.userId, `${member.firstName} ${member.lastName}`)}
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              title={`Remove ${member.firstName} ${member.lastName}`}
+                            >
+                              {removingUserId === member.userId ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -242,7 +270,7 @@ export const DealRoomMembersModal: React.FC<DealRoomMembersModalProps> = ({
                   onOpenManageModal();
                 }}
               >
-                <UserPlus className="h-3.5 w-3.5 mr-1" /> Add / Remove by UUID
+                <UserPlus className="h-3.5 w-3.5 mr-1" /> + Add Members
               </Button>
             )}
           </div>

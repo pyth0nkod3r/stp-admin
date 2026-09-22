@@ -55,8 +55,16 @@ export const API_ENDPOINTS = {
       `/backoffice/content/resources/${resourceId}/archive`,
     newsfeed: "/backoffice/newsfeed",
     newsfeedById: (postId: string) => `/backoffice/newsfeed/${postId}`,
+    // Public Prospective Alumni Account Requests
+    accountRequests: "/backoffice/account-requests",
+    accountRequestById: (requestId: string) => `/backoffice/account-requests/${requestId}`,
+    // Backwards compatibility alias for supportMessages pointing to account-requests
     supportMessages: "/backoffice/account-requests",
     supportMessageById: (requestId: string) => `/backoffice/account-requests/${requestId}`,
+    // Backoffice User Support Inquiries
+    supportTickets: "/backoffice/support",
+    supportTicketById: (supportId: string) => `/backoffice/support/${supportId}`,
+    supportUnreadCount: "/backoffice/support/unread-count",
   },
   events: {
     create: "/events",
